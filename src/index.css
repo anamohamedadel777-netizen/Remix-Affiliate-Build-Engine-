@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-obsidian: #040405;
+    --bg-warm-black: #23170D;
+    --surface-card: #0C0B0E;
+    --surface-elevated: #141216;
+    --gold-primary: #F5BF1E;
+    --gold-highlight: #FBD052;
+    --gold-deep: #A7690C;
+    --text-white: #FCFCFA;
+    --text-muted: #A39E93;
+    --border-subtle: rgba(245, 191, 30, 0.14);
+    --border-neutral: rgba(252, 252, 250, 0.08);
+  }
+
+  html,
+  body {
+    background-color: #040405;
+    color: #FCFCFA;
+    font-family: 'Cairo', -apple-system, BlinkMacSystemFont, sans-serif;
+    overscroll-behavior-y: none;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.65;
+  }
+
+  .font-mono,
+  .tabular-nums {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Custom subtle scrollbars for dark workspace */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #040405;
+}
+::-webkit-scrollbar-thumb {
+  background: #23170D;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #A7690C;
+}
+
+@media print {
+  body, html {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
+

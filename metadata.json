@@ -1,0 +1,8 @@
+{
+  "name": "Remix Affiliate Build Engine — محرك بناء بيزنس الأفلييت",
+  "description": "المرحلة الثانية (B — Build) من نظام R.B.T.L.S لتحويل أبحاث السوق إلى بنية تحتية متكاملة للأفلييت: رحلة العميل، الفانل، الـLead Magnet، الصفحات، الإيميلات، الأتمتة، والتتبع.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
