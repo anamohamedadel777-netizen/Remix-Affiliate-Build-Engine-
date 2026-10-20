@@ -24,6 +24,8 @@ interface Stage6EmailProps {
   emailSystem: EmailSystemData | null;
   onGenerateEmailSystem: () => Promise<void>;
   onGenerateAllEmailsCopy?: () => Promise<void>;
+  onGenerateSingleEmail?: (emailNumber: number) => Promise<void>;
+  onConfirmBlueprint?: () => void;
   onRewriteSingleEmail: (emailNumber: number) => Promise<void>;
   onUpdateEmailCopy: (emailNumber: number, patch: Partial<GeneratedEmailCopy>) => void;
   isEmailSequenceLocked: boolean;
@@ -36,6 +38,8 @@ export const Stage6EmailSystem: React.FC<Stage6EmailProps> = ({
   emailSystem,
   onGenerateEmailSystem,
   onGenerateAllEmailsCopy,
+  onGenerateSingleEmail,
+  onConfirmBlueprint,
   onRewriteSingleEmail,
   onUpdateEmailCopy,
   isEmailSequenceLocked,
@@ -68,9 +72,9 @@ export const Stage6EmailSystem: React.FC<Stage6EmailProps> = ({
     );
   }
 
-  const activeEmail =
-    emailSystem.emailsCopy.find((e) => e.emailNumber === selectedEmailNum) ||
-    emailSystem.emailsCopy[0];
+  const activeEmail = (emailSystem.emailsCopy || []).find(
+    (e) => e.emailNumber === selectedEmailNum
+  );
 
   return (
     <div className="space-y-8">
@@ -89,7 +93,7 @@ export const Stage6EmailSystem: React.FC<Stage6EmailProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          {onGenerateAllEmailsCopy && (
+          {emailSystem.blueprintApprovedByStudent && onGenerateAllEmailsCopy && (
             <button
               type="button"
               disabled={isGenerating || isEmailSequenceLocked}
@@ -210,26 +214,59 @@ export const Stage6EmailSystem: React.FC<Stage6EmailProps> = ({
         </div>
       </div>
 
-      {/* Interactive Email Copy Editor & Subject Line Engine */}
-      {activeEmail && (
-        <div className="bg-[#0C0B0E] border border-[#F5BF1E]/30 rounded-xl p-6 space-y-5">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
-            <div className="flex flex-wrap items-center gap-2">
-              {emailSystem.emailsCopy.map((em) => (
+      {/* Student Blueprint Confirmation Box or Interactive Email Copy Engine */}
+      {!emailSystem.blueprintApprovedByStudent ? (
+        <div className="bg-[#0C0B0E] border border-amber-500/30 rounded-xl p-6 text-center space-y-3">
+          <div className="text-sm font-bold text-[#FCFCFA]">
+            مخطط السلسلة جاهز للمراجعة والاعتماد
+          </div>
+          <p className="text-xs text-[#A39E93] max-w-md mx-auto">
+            راجع وظائف الإيميلات وزوايا العناوين والاعتراضات المعالجة في الجدول أعلاه، ثم اضغط لاعتماد المخطط وتوليد نصوص الإيميلات عند الطلب.
+          </p>
+          {onConfirmBlueprint && (
+            <button
+              type="button"
+              disabled={isGenerating}
+              onClick={onConfirmBlueprint}
+              className="px-6 py-2.5 bg-[#F5BF1E] hover:bg-[#FBD052] text-[#040405] font-bold text-xs rounded-lg inline-flex items-center gap-2 transition-colors"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              <span>اعتماد هيكل ومخطط السلسلة</span>
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {/* Blueprint Email Tabs */}
+          <div className="flex flex-wrap items-center gap-2 p-2 bg-[#0C0B0E] border border-white/10 rounded-xl">
+            {emailSystem.blueprint.map((bp) => {
+              const hasCopy = (emailSystem.emailsCopy || []).some(
+                (em) => em.emailNumber === bp.emailNumber
+              );
+              return (
                 <button
-                  key={em.emailNumber}
+                  key={bp.emailNumber}
                   type="button"
-                  onClick={() => setSelectedEmailNum(em.emailNumber)}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                    selectedEmailNum === em.emailNumber
+                  onClick={() => setSelectedEmailNum(bp.emailNumber)}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 ${
+                    selectedEmailNum === bp.emailNumber
                       ? 'bg-[#F5BF1E] text-[#040405]'
                       : 'bg-[#141216] text-[#A39E93] hover:text-white border border-white/10'
                   }`}
                 >
-                  الإيميل <bdi dir="ltr">0{em.emailNumber}</bdi>
+                  <span>الإيميل <bdi dir="ltr">0{bp.emailNumber}</bdi></span>
+                  {hasCopy && <span className="text-[10px] text-emerald-400">✓</span>}
                 </button>
-              ))}
-            </div>
+              );
+            })}
+          </div>
+
+          {activeEmail ? (
+            <div className="bg-[#0C0B0E] border border-[#F5BF1E]/30 rounded-xl p-6 space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
+                <div className="text-sm font-bold text-[#FCFCFA]">
+                  نص الإيميل <bdi dir="ltr">0{activeEmail.emailNumber}</bdi>
+                </div>
 
             <div className="flex items-center gap-2">
               <select
@@ -373,6 +410,29 @@ export const Stage6EmailSystem: React.FC<Stage6EmailProps> = ({
             </div>
           </div>
         </div>
+      ) : (
+            <div className="bg-[#0C0B0E] border border-white/10 rounded-xl p-8 text-center space-y-4">
+              <Mail className="w-10 h-10 text-[#F5BF1E] mx-auto" />
+              <h2 className="text-xl font-bold text-[#FCFCFA]">
+                نص الإيميل رقم 0{selectedEmailNum} لم يُبنَ بعد
+              </h2>
+              <p className="text-xs text-[#A39E93] max-w-md mx-auto">
+                تم اعتماد المخطط بنجاح. اضغط لتوليد نص هذا الإيميل مع خيارات العناوين وفحص التضليل بناءً على المخطط المعتمد.
+              </p>
+              {onGenerateSingleEmail && (
+                <button
+                  type="button"
+                  disabled={isGenerating}
+                  onClick={() => onGenerateSingleEmail(selectedEmailNum)}
+                  className="px-5 py-2.5 bg-[#F5BF1E] hover:bg-[#FBD052] text-[#040405] font-bold text-xs rounded-lg inline-flex items-center gap-2 transition-colors"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>{isGenerating ? `جاري كتابة الإيميل 0${selectedEmailNum}...` : 'توليد نص هذا الإيميل'}</span>
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       <div className="flex justify-end">
@@ -505,54 +565,77 @@ export const Stage7AutomationArchitect: React.FC<Stage7AutomationProps> = ({
       </div>
 
       {/* Visual Automation Map */}
-      <div className="bg-[#0C0B0E] border border-white/10 rounded-xl p-6 space-y-5">
-        <h2 className="text-lg font-bold text-[#FCFCFA]">
-          خريطة مسار الأتمتة خطوة بخطوة (Automation Workflow Map)
-        </h2>
+      {!automation.workflowNodes || automation.workflowNodes.length === 0 ? (
+        <div className="bg-[#0C0B0E] border border-white/10 rounded-xl p-8 text-center space-y-4">
+          <Workflow className="w-10 h-10 text-[#F5BF1E] mx-auto" />
+          <h2 className="text-xl font-bold text-[#FCFCFA]">
+            مخطط سير العمل البصري لم يُبنَ بعد
+          </h2>
+          <p className="text-xs text-[#A39E93] max-w-md mx-auto">
+            تم توليد معمارية التاجات والمشغلات وشروط الخروج الآمنة بنجاح. اضغط لبناء شجرة الأتمتة البصرية الكاملة لمنصة {automation.selectedPlatform}.
+          </p>
+          {(onExpandAutomationDetails || onGenerateAutomation) && (
+            <button
+              type="button"
+              disabled={isGenerating}
+              onClick={() => onExpandAutomationDetails ? onExpandAutomationDetails() : onGenerateAutomation(automation.selectedPlatform)}
+              className="px-5 py-2.5 bg-[#F5BF1E] hover:bg-[#FBD052] text-[#040405] font-bold text-xs rounded-lg inline-flex items-center gap-2 transition-colors"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>{isGenerating ? 'جاري بناء شجرة الأتمتة...' : `بناء شجرة الأتمتة البصرية لـ ${automation.selectedPlatform}`}</span>
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="bg-[#0C0B0E] border border-white/10 rounded-xl p-6 space-y-5">
+          <h2 className="text-lg font-bold text-[#FCFCFA]">
+            خريطة مسار الأتمتة خطوة بخطوة (Automation Workflow Map)
+          </h2>
 
-        <div className="space-y-3">
-          {automation.workflowNodes.map((node, idx) => (
-            <div key={node.id} className="space-y-2">
-              <div className="bg-[#141216] border border-white/10 rounded-xl p-4 space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold text-[#F5BF1E]">
-                      <bdi dir="ltr">[{node.stepType}]</bdi>
-                    </span>
-                    <h3 className="text-sm font-bold text-[#FCFCFA]">{node.titleAr}</h3>
+          <div className="space-y-3">
+            {automation.workflowNodes.map((node, idx) => (
+              <div key={node.id} className="space-y-2">
+                <div className="bg-[#141216] border border-white/10 rounded-xl p-4 space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono font-bold text-[#F5BF1E]">
+                        <bdi dir="ltr">[{node.stepType}]</bdi>
+                      </span>
+                      <h3 className="text-sm font-bold text-[#FCFCFA]">{node.titleAr}</h3>
+                    </div>
+                    {node.tagInvolved && (
+                      <span className="text-xs font-mono text-emerald-400">
+                        <bdi dir="ltr">{node.tagInvolved}</bdi>
+                      </span>
+                    )}
                   </div>
-                  {node.tagInvolved && (
-                    <span className="text-xs font-mono text-emerald-400">
-                      <bdi dir="ltr">{node.tagInvolved}</bdi>
-                    </span>
+                  <p className="text-xs text-[#D6D3CD]">{node.detailAr}</p>
+
+                  {(node.yesBranchAr || node.noBranchAr) && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 text-xs">
+                      {node.yesBranchAr && (
+                        <div className="bg-[#040405] p-2.5 rounded border border-emerald-500/30">
+                          <strong className="text-emerald-400">مسار نعم (YES): </strong>
+                          <span className="text-[#FCFCFA]">{node.yesBranchAr}</span>
+                        </div>
+                      )}
+                      {node.noBranchAr && (
+                        <div className="bg-[#040405] p-2.5 rounded border border-amber-500/30">
+                          <strong className="text-amber-400">مسار لا (NO): </strong>
+                          <span className="text-[#FCFCFA]">{node.noBranchAr}</span>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
-                <p className="text-xs text-[#D6D3CD]">{node.detailAr}</p>
-
-                {(node.yesBranchAr || node.noBranchAr) && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 text-xs">
-                    {node.yesBranchAr && (
-                      <div className="bg-[#040405] p-2.5 rounded border border-emerald-500/30">
-                        <strong className="text-emerald-400">مسار نعم (YES): </strong>
-                        <span className="text-[#FCFCFA]">{node.yesBranchAr}</span>
-                      </div>
-                    )}
-                    {node.noBranchAr && (
-                      <div className="bg-[#040405] p-2.5 rounded border border-amber-500/30">
-                        <strong className="text-amber-400">مسار لا (NO): </strong>
-                        <span className="text-[#FCFCFA]">{node.noBranchAr}</span>
-                      </div>
-                    )}
-                  </div>
+                {automation.workflowNodes && idx < automation.workflowNodes.length - 1 && (
+                  <div className="text-center text-[#F5BF1E] font-mono text-xs">↓</div>
                 )}
               </div>
-              {idx < automation.workflowNodes.length - 1 && (
-                <div className="text-center text-[#F5BF1E] font-mono text-xs">↓</div>
-              )}
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Clean Tagging Architecture */}
       <div className="bg-[#0C0B0E] border border-white/10 rounded-xl p-6 space-y-4">
@@ -615,7 +698,7 @@ export const Stage7AutomationArchitect: React.FC<Stage7AutomationProps> = ({
           ))}
         </div>
 
-        {automation.platformTranslationNotesAr.length > 0 && (
+        {automation.platformTranslationNotesAr && automation.platformTranslationNotesAr.length > 0 && (
           <div className="bg-[#141216] border border-white/10 rounded-xl p-4 space-y-2 text-xs">
             <div className="font-bold text-[#FBD052]">
               ملاحظات التنفيذ على المنصات (<bdi dir="ltr">{automation.selectedPlatform}</bdi>):

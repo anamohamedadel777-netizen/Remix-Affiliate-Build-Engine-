@@ -12,6 +12,7 @@ import {
 interface Stage2JourneyAndMessageMatchProps {
   journey: CustomerJourneyData | null;
   onGenerateJourney: () => Promise<void>;
+  onGenerateJourneyDetails?: (stepOrder: number) => Promise<void>;
   onUpdateMessageChain: (updatedChain: MessageMatchLink[], overallStatus: 'ALIGNED' | 'MESSAGE MISMATCH', reason?: string) => void;
   onProceedToFunnel: () => void;
   isGenerating: boolean;
@@ -20,6 +21,7 @@ interface Stage2JourneyAndMessageMatchProps {
 export const Stage2JourneyAndMessageMatch: React.FC<Stage2JourneyAndMessageMatchProps> = ({
   journey,
   onGenerateJourney,
+  onGenerateJourneyDetails,
   onUpdateMessageChain,
   onProceedToFunnel,
   isGenerating
@@ -190,30 +192,78 @@ export const Stage2JourneyAndMessageMatch: React.FC<Stage2JourneyAndMessageMatch
           {journey.journeySteps.map((step) => (
             <div
               key={step.stepOrder}
-              className="bg-[#141216] border border-white/10 rounded-xl p-4 grid grid-cols-1 lg:grid-cols-4 gap-4 items-center"
+              className="bg-[#141216] border border-white/10 rounded-xl p-4 space-y-3"
             >
-              <div>
-                <div className="text-xs font-mono text-[#F5BF1E]">
-                  الخطوة <bdi dir="ltr">0{step.stepOrder}</bdi> · <bdi dir="ltr">{step.stageNameEn}</bdi>
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-center">
+                <div>
+                  <div className="text-xs font-mono text-[#F5BF1E]">
+                    الخطوة <bdi dir="ltr">0{step.stepOrder}</bdi> · <bdi dir="ltr">{step.stageNameEn}</bdi>
+                  </div>
+                  <div className="text-sm font-bold text-[#FCFCFA] mt-0.5">
+                    {step.stageNameAr}
+                  </div>
                 </div>
-                <div className="text-sm font-bold text-[#FCFCFA] mt-0.5">
-                  {step.stageNameAr}
+                <div>
+                  <div className="text-[11px] text-[#A39E93]">ماذا يدور في ذهن الزائر؟</div>
+                  <div className="text-xs text-[#FCFCFA] mt-0.5">{step.visitorMindset}</div>
+                </div>
+                <div>
+                  <div className="text-[11px] text-[#A39E93]">تركيز الرسالة (Message Focus)</div>
+                  <div className="text-xs text-[#FBD052] mt-0.5">{step.messageFocus}</div>
+                </div>
+                <div className="flex items-center justify-between lg:justify-end gap-2">
+                  <div>
+                    <div className="text-[11px] text-[#A39E93]">الخطوة التالية المطلوبة</div>
+                    <div className="text-xs text-emerald-300 font-medium mt-0.5">
+                      {step.recommendedAction}
+                    </div>
+                  </div>
+                  {onGenerateJourneyDetails && (
+                    <button
+                      type="button"
+                      disabled={isGenerating}
+                      onClick={() => onGenerateJourneyDetails(step.stepOrder)}
+                      className="px-2.5 py-1 bg-[#040405] hover:bg-[#23170D] border border-[#F5BF1E]/30 rounded text-[11px] text-[#FBD052] whitespace-nowrap self-end"
+                      title="توسيع التشخيص العميق لهذه الخطوة"
+                    >
+                      {step.details ? 'تحديث التفاصيل' : 'تفاصيل أعمق'}
+                    </button>
+                  )}
                 </div>
               </div>
-              <div>
-                <div className="text-[11px] text-[#A39E93]">ماذا يدور في ذهن الزائر؟</div>
-                <div className="text-xs text-[#FCFCFA] mt-0.5">{step.visitorMindset}</div>
-              </div>
-              <div>
-                <div className="text-[11px] text-[#A39E93]">تركيز الرسالة (Message Focus)</div>
-                <div className="text-xs text-[#FBD052] mt-0.5">{step.messageFocus}</div>
-              </div>
-              <div>
-                <div className="text-[11px] text-[#A39E93]">الخطوة التالية المطلوبة</div>
-                <div className="text-xs text-emerald-300 font-medium mt-0.5">
-                  {step.recommendedAction}
+
+              {step.details && (
+                <div className="pt-3 border-t border-white/8 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs bg-[#0C0B0E]/60 p-3 rounded-lg">
+                  <div>
+                    <div className="text-[#F5BF1E] font-semibold mb-0.5">تحليل الحالة الذهنية العميق:</div>
+                    <p className="text-[#FCFCFA]">{step.details.deepMindsetAnalysisAr}</p>
+                  </div>
+                  <div>
+                    <div className="text-emerald-400 font-semibold mb-0.5">نصيحة الالتزام المصغر:</div>
+                    <p className="text-[#FCFCFA]">{step.details.microCommitmentAdviceAr}</p>
+                  </div>
+                  {step.details.recommendedFrictionReducersAr?.length > 0 && (
+                    <div>
+                      <div className="text-[#A39E93] font-semibold mb-0.5">مقللات الاحتكاك المقترحة:</div>
+                      <ul className="list-disc list-inside space-y-0.5 text-[#D6D3CD]">
+                        {step.details.recommendedFrictionReducersAr.map((f, i) => (
+                          <li key={i}>{f}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {step.details.trustSignalsNeededAr?.length > 0 && (
+                    <div>
+                      <div className="text-[#A39E93] font-semibold mb-0.5">إشارات الثقة المطلوبة:</div>
+                      <ul className="list-disc list-inside space-y-0.5 text-[#D6D3CD]">
+                        {step.details.trustSignalsNeededAr.map((t, i) => (
+                          <li key={i}>{t}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
             </div>
           ))}
         </div>

@@ -219,9 +219,9 @@ app.post('/api/build/journey', async (req, res) => {
 
   if (mode === 'journey_details') {
     const prompt = `أنت تصمم تفاصيل إضافية وتشخيصاً معمقاً لمرحلة محددة في رحلة العميل (Customer Journey Deep Diagnostics):
-المدخلات: ${JSON.stringify(researchInput)}
 المرحلة المستهدفة: ${selectedStepOrder || 1}
-قم بتقديم تفاصيل سلوكية ونفسية دقيقة ومكثفة لتلك المرحلة بدون إطالة زائدة.`;
+المشكلة والجمهور: ${researchInput?.primaryProblem || ''} - ${researchInput?.audience || ''}
+Keep every explanation concise. Maximum 1–2 short sentences per explanatory field. Do not produce essays.`;
 
     const result = await AIProviderManager.generateStructured({
       task: 'GENERATE_JOURNEY_DETAILS',
@@ -245,7 +245,8 @@ app.post('/api/build/journey', async (req, res) => {
         ]
       },
       connectionConfig: config,
-      requestId
+      requestId,
+      timeoutMs: 35000
     });
 
     return res.json(result);
@@ -253,7 +254,7 @@ app.post('/api/build/journey', async (req, res) => {
 
   // Fast Decision First: journey_strategy
   const prompt = `بناءً على مدخلات البحث، قم بإنشاء استراتيجية رحلة العميل السريعة وعالية الأثر (Customer Journey Strategy):
-المطلوب إجابة مركزة وسريعة (Concise & High-Impact) بدون حشو إنشائي لتمكين الطالب من اتخاذ القرار فوراً:
+Keep every explanation concise. Maximum 1–2 short sentences per explanatory field. Do not produce essays:
 البحث: ${JSON.stringify(researchInput, null, 2)}
 العناصر المقفلة: ${JSON.stringify(lockedElements || {})}`;
 
@@ -367,7 +368,8 @@ app.post('/api/build/journey', async (req, res) => {
       ]
     },
     connectionConfig: config,
-    requestId
+    requestId,
+    timeoutMs: 35000
   });
 
   return res.json(result);
@@ -381,10 +383,11 @@ app.post('/api/build/funnel', async (req, res) => {
   const { researchInput, customerJourney, mode = 'funnel_options', selectedFunnelId } = req.body;
 
   if (mode === 'funnel_details') {
-    const prompt = `أنت مهندس الفانل المعماري (Funnel Architect). قم ببناء خريطة تدفق الفانل البصرية الكاملة والنسخة المصغرة القابلة للتشغيل (Minimum Viable Funnel) للنموذج المختار:
+    const prompt = `أنت مهندس الفانل المعماري (Funnel Architect). قم ببناء خريطة تدفق الفانل البصرية الكاملة والنسخة المصغرة القابلة للتشغيل (Minimum Viable Funnel) للنموذج المختار فقط:
 الفانل المختار: ${selectedFunnelId || 'النموذج الموصى به'}
-البحث: ${JSON.stringify(researchInput)}
-رحلة العميل: ${JSON.stringify(customerJourney)}`;
+البحث: ${researchInput?.primaryProblem || ''} - ${researchInput?.audience || ''}
+رحلة العميل: هدف الدخول ${customerJourney?.desiredNextStep || ''}
+Keep every explanation concise. Maximum 1–2 short sentences per explanatory field. Do not produce essays.`;
 
     const result = await AIProviderManager.generateStructured({
       task: 'GENERATE_FUNNEL_DETAILS',
@@ -435,16 +438,19 @@ app.post('/api/build/funnel', async (req, res) => {
         required: ['funnelMapNodes', 'minimumViableFunnel']
       },
       connectionConfig: config,
-      requestId
+      requestId,
+      timeoutMs: 40000
     });
 
     return res.json(result);
   }
 
   // Phase A: funnel_options (Fast Decision First)
-  const prompt = `بناءً على مدخلات البحث ورحلة العميل، قيّم 4 نماذج فانل مختلفة على 10 أبعاد، واختر الأنسب مع تقديم خريطة الفانل والنسخة المصغرة بسرعة ودقة:
-البحث: ${JSON.stringify(researchInput)}
-رحلة العميل: ${JSON.stringify(customerJourney)}`;
+  // MUST RETURN ONLY: evaluatedModels, primaryFunnelId, secondaryFunnelId, whyPrimaryFitsAr, mainRiskAr, whatMustBeTrueAr, doNotBuildYetAr
+  // MUST NOT contain funnelMapNodes or minimumViableFunnel!
+  const prompt = `بناءً على مدخلات البحث ورحلة العميل، قيّم ما بين 3 إلى 4 نماذج فانل على 10 أبعاد واختر الأنسب للمبتدئ.
+Keep every explanation concise. Maximum 1–2 short sentences per explanatory field. Do not produce essays.
+البحث: ${researchInput?.primaryProblem || ''} - ${researchInput?.niche || ''} - ${researchInput?.audience || ''}`;
 
   const result = await AIProviderManager.generateStructured({
     task: 'GENERATE_FUNNEL_OPTIONS',
@@ -517,44 +523,6 @@ app.post('/api/build/funnel', async (req, res) => {
         doNotBuildYetAr: {
           type: Type.ARRAY,
           items: { type: Type.STRING }
-        },
-        funnelMapNodes: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              id: { type: Type.STRING },
-              order: { type: Type.INTEGER },
-              nodeTitleAr: { type: Type.STRING },
-              nodeTypeEn: { type: Type.STRING },
-              purpose: { type: Type.STRING },
-              visitorQuestion: { type: Type.STRING },
-              mainMessage: { type: Type.STRING },
-              cta: { type: Type.STRING },
-              trackingEvent: { type: Type.STRING }
-            },
-            required: [
-              'id',
-              'order',
-              'nodeTitleAr',
-              'nodeTypeEn',
-              'purpose',
-              'visitorQuestion',
-              'mainMessage',
-              'cta',
-              'trackingEvent'
-            ]
-          }
-        },
-        minimumViableFunnel: {
-          type: Type.OBJECT,
-          properties: {
-            minimumBuild: { type: Type.ARRAY, items: { type: Type.STRING } },
-            optionalLater: { type: Type.ARRAY, items: { type: Type.STRING } },
-            scaleVersion: { type: Type.ARRAY, items: { type: Type.STRING } },
-            overbuildWarningAr: { type: Type.STRING }
-          },
-          required: ['minimumBuild', 'optionalLater', 'scaleVersion', 'overbuildWarningAr']
         }
       },
       required: [
@@ -564,13 +532,12 @@ app.post('/api/build/funnel', async (req, res) => {
         'whyPrimaryFitsAr',
         'mainRiskAr',
         'whatMustBeTrueAr',
-        'doNotBuildYetAr',
-        'funnelMapNodes',
-        'minimumViableFunnel'
+        'doNotBuildYetAr'
       ]
     },
     connectionConfig: config,
-    requestId
+    requestId,
+    timeoutMs: 35000
   });
 
   // Critical requirement: The AI CANNOT confirm on behalf of the student
@@ -587,7 +554,6 @@ app.post('/api/build/lead-magnet', async (req, res) => {
   const config = extractConnectionConfig(req);
   const {
     researchInput,
-    customerJourney,
     funnelStrategy,
     mode = 'lead_magnet_options',
     selectedConceptId,
@@ -595,10 +561,11 @@ app.post('/api/build/lead-magnet', async (req, res) => {
   } = req.body;
 
   if (mode === 'lead_magnet_details') {
-    const prompt = `أنت مهندس الـLead Magnet المعماري (Lead Magnet Architect). قم ببناء الهيكل التفصيلي القابل للتنفيذ (Content Architecture)، وصياغة الوعد النهائي المعتمد (Promise Statement)، والجسر الاستراتيجي المحكم نحو العرض (Strategic Offer Bridge) للمفهوم المختار:
+    const prompt = `أنت مهندس الـLead Magnet المعماري (Lead Magnet Architect). قم ببناء الهيكل التفصيلي القابل للتنفيذ (Content Architecture)، وصياغة الوعد النهائي (Promise Statement)، والجسر الاستراتيجي المحكم نحو العرض (Strategic Offer Bridge) للمفهوم المختار:
 المفهوم المختار: ${JSON.stringify(selectedConcept || { id: selectedConceptId })}
-البحث: ${JSON.stringify(researchInput)}
-الفانل المعتمد: ${JSON.stringify(funnelStrategy?.primaryFunnelId)}`;
+المشكلة والنتيجة: ${researchInput?.primaryProblem || ''} -> ${researchInput?.desiredOutcome || ''}
+الفانل المعتمد: ${funnelStrategy?.primaryFunnelId || ''}
+Keep every explanation concise. Maximum 1–2 short sentences per explanatory field. Do not produce essays.`;
 
     const result = await AIProviderManager.generateStructured({
       task: 'GENERATE_LEAD_MAGNET_DETAILS',
@@ -667,20 +634,23 @@ app.post('/api/build/lead-magnet', async (req, res) => {
         required: ['promiseStatement', 'contentArchitecture', 'offerBridge']
       },
       connectionConfig: config,
-      requestId
+      requestId,
+      timeoutMs: 40000
     });
 
+    // Important: Do NOT automatically set status = APPROVED. AI cannot approve on behalf of student.
     if (result.success && result.data && result.data.promiseStatement) {
-      result.data.promiseStatement.status = 'APPROVED';
+      result.data.promiseStatement.status = 'REVIEW';
     }
 
     return res.json(result);
   }
 
   // Phase A: lead_magnet_options (Fast Decision First)
-  const prompt = `بناءً على البحث ورحلة العميل والفانل، ابتكر 5 أفكار Lead Magnet متنوعة الصيغ وقيمها في الأبعاد العشرة، مع صياغة الوعد المبدئي لكل منها بسرعة ودقة:
-البحث: ${JSON.stringify(researchInput)}
-الفانل المختار: ${JSON.stringify(funnelStrategy?.primaryFunnelId)}`;
+  // MUST RETURN ONLY: concepts and selectedConceptId. NO full blueprint!
+  const prompt = `بناءً على البحث، ابتكر 5 أفكار Lead Magnet متنوعة الصيغ وقيمها على الأبعاد العشرة، مع صياغة الوعد المبدئي لكل منها.
+Keep every explanation concise. Maximum 1–2 short sentences per explanatory field. Do not produce essays.
+البحث: ${researchInput?.primaryProblem || ''} - ${researchInput?.audience || ''}`;
 
   const result = await AIProviderManager.generateStructured({
     task: 'GENERATE_LEAD_MAGNET_OPTIONS',
@@ -746,81 +716,17 @@ app.post('/api/build/lead-magnet', async (req, res) => {
             ]
           }
         },
-        selectedConceptId: { type: Type.STRING },
-        promiseStatement: {
-          type: Type.OBJECT,
-          properties: {
-            specificProblem: { type: Type.STRING },
-            usefulOutcome: { type: Type.STRING },
-            reasonableTimeEffort: { type: Type.STRING },
-            fullPromiseAr: { type: Type.STRING }
-          },
-          required: [
-            'specificProblem',
-            'usefulOutcome',
-            'reasonableTimeEffort',
-            'fullPromiseAr'
-          ]
-        },
-        contentArchitecture: {
-          type: Type.OBJECT,
-          properties: {
-            formatType: { type: Type.STRING },
-            sections: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  sectionNameAr: { type: Type.STRING },
-                  sectionRoleEn: { type: Type.STRING },
-                  detailsAr: { type: Type.STRING },
-                  actionableItems: {
-                    type: Type.ARRAY,
-                    items: { type: Type.STRING }
-                  }
-                },
-                required: ['sectionNameAr', 'sectionRoleEn', 'detailsAr', 'actionableItems']
-              }
-            },
-            ctaInsideAsset: { type: Type.STRING }
-          },
-          required: ['formatType', 'sections', 'ctaInsideAsset']
-        },
-        offerBridge: {
-          type: Type.OBJECT,
-          properties: {
-            leadMagnetProblem: { type: Type.STRING },
-            insightDelivered: { type: Type.STRING },
-            remainingGap: { type: Type.STRING },
-            solutionCategory: { type: Type.STRING },
-            offerConnection: { type: Type.STRING }
-          },
-          required: [
-            'leadMagnetProblem',
-            'insightDelivered',
-            'remainingGap',
-            'solutionCategory',
-            'offerConnection'
-          ]
-        }
+        selectedConceptId: { type: Type.STRING }
       },
-      required: [
-        'concepts',
-        'selectedConceptId',
-        'promiseStatement',
-        'contentArchitecture',
-        'offerBridge'
-      ]
+      required: ['concepts', 'selectedConceptId']
     },
     connectionConfig: config,
-    requestId
+    requestId,
+    timeoutMs: 35000
   });
 
   if (result.success && result.data) {
     result.data.confirmedByStudent = false;
-    if (result.data.promiseStatement) {
-      result.data.promiseStatement.status = 'APPROVED';
-    }
   }
 
   return res.json(result);
@@ -835,191 +741,229 @@ app.post('/api/build/pages', async (req, res) => {
     leadMagnet,
     proofLibrary,
     mode = 'pages_strategy',
+    pageId = 'landing',
     selectedHeadlineId,
     headlineText
   } = req.body;
 
-  if (mode === 'page_details') {
-    const prompt = `أنت كاتب نصوص تحويلية ومهندس صفحات مباشر (Direct-Response Page Copywriter). قم بصياغة النصوص الكاملة لصفحة الهبوط والشكر والجسر والمقارنة بناءً على العنوان المختار:
-العنوان المختار: ${headlineText || selectedHeadlineId || 'العنوان الرئيسي الموصى به'}
-البحث: ${JSON.stringify(researchInput)}
-الـLead Magnet: ${JSON.stringify(leadMagnet?.promiseStatement)}
+  // Phase B: page_copy / page_details — GENERATES ONLY ONE PAGE PER REQUEST!
+  if (mode === 'page_details' || mode === 'page_copy') {
+    let pageSchema: any;
+    let pageTask: string;
+    let pagePrompt: string;
+
+    switch (pageId) {
+      case 'thank-you':
+        pageTask = 'GENERATE_PAGE_THANK_YOU';
+        pagePrompt = `قم بكتابة نص صفحة الشكر (Thank You Page Copy) للـLead Magnet:
+الوعد: ${leadMagnet?.promiseStatement?.fullPromiseAr || ''}
+Keep every explanation concise. Maximum 1–2 short sentences per explanatory field.`;
+        pageSchema = {
+          type: Type.OBJECT,
+          properties: {
+            primaryObjectiveAr: { type: Type.STRING },
+            deliveryInstructionAr: { type: Type.STRING },
+            expectationSettingAr: { type: Type.STRING },
+            microCommitmentAskAr: { type: Type.STRING },
+            offerPreFrameAr: { type: Type.STRING },
+            whitelistInstructionAr: { type: Type.STRING },
+            nextStepCtaAr: { type: Type.STRING }
+          },
+          required: [
+            'primaryObjectiveAr',
+            'deliveryInstructionAr',
+            'expectationSettingAr',
+            'microCommitmentAskAr',
+            'offerPreFrameAr',
+            'whitelistInstructionAr',
+            'nextStepCtaAr'
+          ]
+        };
+        break;
+
+      case 'bridge':
+        pageTask = 'GENERATE_PAGE_BRIDGE';
+        pagePrompt = `قم بكتابة نص صفحة الجسر التثقيفية (Bridge Page Copy):
+المشكلة والحل: ${researchInput?.primaryProblem || ''} -> ${researchInput?.desiredOutcome || ''}
+Keep every explanation concise. Maximum 1–2 short sentences per explanatory field.`;
+        pageSchema = {
+          type: Type.OBJECT,
+          properties: {
+            isStrategicallyRequired: { type: Type.BOOLEAN },
+            problemRecapAr: { type: Type.STRING },
+            whatToLookForAr: { type: Type.STRING },
+            whySolutionCategoryMattersAr: { type: Type.STRING },
+            productIntroductionAr: { type: Type.STRING },
+            pros: { type: Type.ARRAY, items: { type: Type.STRING } },
+            potentialLimitations: { type: Type.ARRAY, items: { type: Type.STRING } },
+            whoItSuitsAr: { type: Type.ARRAY, items: { type: Type.STRING } },
+            whoItMayNotSuitAr: { type: Type.ARRAY, items: { type: Type.STRING } },
+            ctaTextAr: { type: Type.STRING },
+            affiliateDisclosureAr: { type: Type.STRING }
+          },
+          required: [
+            'isStrategicallyRequired',
+            'problemRecapAr',
+            'whatToLookForAr',
+            'whySolutionCategoryMattersAr',
+            'productIntroductionAr',
+            'pros',
+            'potentialLimitations',
+            'whoItSuitsAr',
+            'whoItMayNotSuitAr',
+            'ctaTextAr',
+            'affiliateDisclosureAr'
+          ]
+        };
+        break;
+
+      case 'comparison':
+        pageTask = 'GENERATE_PAGE_COMPARISON';
+        pagePrompt = `قم بكتابة نص صفحة المراجعة والمقارنة الموضوعية (Review & Comparison Page):
+العرض والجمهور: ${researchInput?.selectedOffer || ''} - ${researchInput?.audience || ''}
+Keep every explanation concise. Maximum 1–2 short sentences per explanatory field.`;
+        pageSchema = {
+          type: Type.OBJECT,
+          properties: {
+            isIncluded: { type: Type.BOOLEAN },
+            pageType: { type: Type.STRING },
+            decisionCriteria: { type: Type.ARRAY, items: { type: Type.STRING } },
+            featureComparisonRows: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  feature: { type: Type.STRING },
+                  offerNote: { type: Type.STRING },
+                  alternativeNote: { type: Type.STRING }
+                },
+                required: ['feature', 'offerNote', 'alternativeNote']
+              }
+            },
+            useCasesAr: { type: Type.ARRAY, items: { type: Type.STRING } },
+            limitationsAr: { type: Type.ARRAY, items: { type: Type.STRING } },
+            pricingVerificationNoteAr: { type: Type.STRING },
+            affiliateDisclosureAr: { type: Type.STRING },
+            ctaAr: { type: Type.STRING }
+          },
+          required: [
+            'isIncluded',
+            'pageType',
+            'decisionCriteria',
+            'featureComparisonRows',
+            'useCasesAr',
+            'limitationsAr',
+            'pricingVerificationNoteAr',
+            'affiliateDisclosureAr',
+            'ctaAr'
+          ]
+        };
+        break;
+
+      case 'landing':
+      default:
+        pageTask = 'GENERATE_PAGE_LANDING';
+        pagePrompt = `قم بكتابة نص صفحة الهبوط المباشرة (Landing Page Copy) فقط بناءً على العنوان:
+العنوان المعتمد: ${headlineText || selectedHeadlineId || 'العنوان الرئيسي'}
+الـLead Magnet: ${leadMagnet?.promiseStatement?.fullPromiseAr || ''}
 مكتبة الإثبات: ${JSON.stringify(proofLibrary || [])}
-قواعد: بدون شهادات وهمية، بدون وعود ثراء سريع، ومع إفصاح أفلييت شفاف.`;
+Keep every explanation concise. Maximum 1–2 short sentences per explanatory field.`;
+        pageSchema = {
+          type: Type.OBJECT,
+          properties: {
+            selectedHeadlineId: { type: Type.STRING },
+            headlineAr: { type: Type.STRING },
+            subheadlineAr: { type: Type.STRING },
+            supportingCopyAr: { type: Type.STRING },
+            whatYouGetBullets: { type: Type.ARRAY, items: { type: Type.STRING } },
+            whyItMattersAr: { type: Type.STRING },
+            whoItIsForAr: { type: Type.ARRAY, items: { type: Type.STRING } },
+            whoItIsNotForAr: { type: Type.ARRAY, items: { type: Type.STRING } },
+            credibilityPlaceholderAr: { type: Type.STRING },
+            ctaButtonTextAr: { type: Type.STRING },
+            privacyMicrocopyAr: { type: Type.STRING },
+            objectionHandlingAr: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  objection: { type: Type.STRING },
+                  response: { type: Type.STRING }
+                },
+                required: ['objection', 'response']
+              }
+            },
+            faqItems: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  question: { type: Type.STRING },
+                  answer: { type: Type.STRING }
+                },
+                required: ['question', 'answer']
+              }
+            },
+            mobileNotesAr: { type: Type.ARRAY, items: { type: Type.STRING } }
+          },
+          required: [
+            'headlineAr',
+            'subheadlineAr',
+            'supportingCopyAr',
+            'whatYouGetBullets',
+            'whyItMattersAr',
+            'whoItIsForAr',
+            'whoItIsNotForAr',
+            'credibilityPlaceholderAr',
+            'ctaButtonTextAr',
+            'privacyMicrocopyAr',
+            'objectionHandlingAr',
+            'faqItems',
+            'mobileNotesAr'
+          ]
+        };
+        break;
+    }
 
     const result = await AIProviderManager.generateStructured({
-      task: 'GENERATE_PAGE_DETAILS',
+      task: pageTask,
       systemInstruction: SYSTEM_BASE_PROMPT,
-      prompt,
-      schema: {
-        type: Type.OBJECT,
-        properties: {
-          landingPage: {
-            type: Type.OBJECT,
-            properties: {
-              selectedHeadlineId: { type: Type.STRING },
-              headlineAr: { type: Type.STRING },
-              subheadlineAr: { type: Type.STRING },
-              supportingCopyAr: { type: Type.STRING },
-              whatYouGetBullets: { type: Type.ARRAY, items: { type: Type.STRING } },
-              whyItMattersAr: { type: Type.STRING },
-              whoItIsForAr: { type: Type.ARRAY, items: { type: Type.STRING } },
-              whoItIsNotForAr: { type: Type.ARRAY, items: { type: Type.STRING } },
-              credibilityPlaceholderAr: { type: Type.STRING },
-              ctaButtonTextAr: { type: Type.STRING },
-              privacyMicrocopyAr: { type: Type.STRING },
-              objectionHandlingAr: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    objection: { type: Type.STRING },
-                    response: { type: Type.STRING }
-                  },
-                  required: ['objection', 'response']
-                }
-              },
-              faqItems: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    question: { type: Type.STRING },
-                    answer: { type: Type.STRING }
-                  },
-                  required: ['question', 'answer']
-                }
-              },
-              mobileNotesAr: { type: Type.ARRAY, items: { type: Type.STRING } }
-            },
-            required: [
-              'headlineAr',
-              'subheadlineAr',
-              'supportingCopyAr',
-              'whatYouGetBullets',
-              'whyItMattersAr',
-              'whoItIsForAr',
-              'whoItIsNotForAr',
-              'credibilityPlaceholderAr',
-              'ctaButtonTextAr',
-              'privacyMicrocopyAr',
-              'objectionHandlingAr',
-              'faqItems',
-              'mobileNotesAr'
-            ]
-          },
-          thankYouPage: {
-            type: Type.OBJECT,
-            properties: {
-              primaryObjectiveAr: { type: Type.STRING },
-              deliveryInstructionAr: { type: Type.STRING },
-              expectationSettingAr: { type: Type.STRING },
-              microCommitmentAskAr: { type: Type.STRING },
-              offerPreFrameAr: { type: Type.STRING },
-              whitelistInstructionAr: { type: Type.STRING },
-              nextStepCtaAr: { type: Type.STRING }
-            },
-            required: [
-              'primaryObjectiveAr',
-              'deliveryInstructionAr',
-              'expectationSettingAr',
-              'microCommitmentAskAr',
-              'offerPreFrameAr',
-              'whitelistInstructionAr',
-              'nextStepCtaAr'
-            ]
-          },
-          bridgePage: {
-            type: Type.OBJECT,
-            properties: {
-              isStrategicallyRequired: { type: Type.BOOLEAN },
-              problemRecapAr: { type: Type.STRING },
-              whatToLookForAr: { type: Type.STRING },
-              whySolutionCategoryMattersAr: { type: Type.STRING },
-              productIntroductionAr: { type: Type.STRING },
-              pros: { type: Type.ARRAY, items: { type: Type.STRING } },
-              potentialLimitations: { type: Type.ARRAY, items: { type: Type.STRING } },
-              whoItSuitsAr: { type: Type.ARRAY, items: { type: Type.STRING } },
-              whoItMayNotSuitAr: { type: Type.ARRAY, items: { type: Type.STRING } },
-              ctaTextAr: { type: Type.STRING },
-              affiliateDisclosureAr: { type: Type.STRING }
-            },
-            required: [
-              'isStrategicallyRequired',
-              'problemRecapAr',
-              'whatToLookForAr',
-              'whySolutionCategoryMattersAr',
-              'productIntroductionAr',
-              'pros',
-              'potentialLimitations',
-              'whoItSuitsAr',
-              'whoItMayNotSuitAr',
-              'ctaTextAr',
-              'affiliateDisclosureAr'
-            ]
-          },
-          reviewComparisonPage: {
-            type: Type.OBJECT,
-            properties: {
-              isIncluded: { type: Type.BOOLEAN },
-              pageType: { type: Type.STRING },
-              decisionCriteria: { type: Type.ARRAY, items: { type: Type.STRING } },
-              featureComparisonRows: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    feature: { type: Type.STRING },
-                    offerNote: { type: Type.STRING },
-                    alternativeNote: { type: Type.STRING }
-                  },
-                  required: ['feature', 'offerNote', 'alternativeNote']
-                }
-              },
-              useCasesAr: { type: Type.ARRAY, items: { type: Type.STRING } },
-              limitationsAr: { type: Type.ARRAY, items: { type: Type.STRING } },
-              pricingVerificationNoteAr: { type: Type.STRING },
-              affiliateDisclosureAr: { type: Type.STRING },
-              ctaAr: { type: Type.STRING }
-            },
-            required: [
-              'isIncluded',
-              'pageType',
-              'decisionCriteria',
-              'featureComparisonRows',
-              'useCasesAr',
-              'limitationsAr',
-              'pricingVerificationNoteAr',
-              'affiliateDisclosureAr',
-              'ctaAr'
-            ]
-          }
-        },
-        required: [
-          'landingPage',
-          'thankYouPage',
-          'bridgePage',
-          'reviewComparisonPage'
-        ]
-      },
+      prompt: pagePrompt,
+      schema: pageSchema,
       connectionConfig: config,
-      requestId
+      requestId,
+      timeoutMs: 40000
     });
 
     if (result.success && result.data) {
-      if (result.data.landingPage) result.data.landingPage.status = 'REVIEW';
-      if (result.data.thankYouPage) result.data.thankYouPage.status = 'REVIEW';
-      if (result.data.bridgePage) result.data.bridgePage.status = 'REVIEW';
-      result.data.claimsAudit = [];
+      result.data.status = 'REVIEW';
+      const propertyKeyMap: Record<string, string> = {
+        landing: 'landingPage',
+        'thank-you': 'thankYouPage',
+        bridge: 'bridgePage',
+        comparison: 'reviewComparisonPage'
+      };
+      const key = propertyKeyMap[pageId] || pageId;
+      return res.json({
+        success: true,
+        requestId,
+        data: {
+          pageId,
+          pageData: result.data,
+          [key]: result.data
+        }
+      });
     }
 
     return res.json(result);
   }
 
   // Phase A: pages_strategy (Fast Decision First)
-  const prompt = `بناءً على البحث والـLead Magnet، حدد خريطة الصفحات المطلوبة (Page Purpose Map) و10 عناوين مقترحة بزوايا مختلفة مع هيكل مبدئي للصفحات بسرعة ودقة:
-البحث: ${JSON.stringify(researchInput)}
-الـLead Magnet: ${JSON.stringify(leadMagnet?.promiseStatement)}`;
+  // MUST RETURN ONLY: pagePurposeMap and headlineOptions (6 items). NO page body copy!
+  const prompt = `بناءً على البحث والـLead Magnet، حدد خريطة وظائف الصفحات المطلوبة (Page Purpose Map) و6 عناوين مقترحة بزوايا مختلفة.
+Keep every explanation concise. Maximum 1–2 short sentences per explanatory field. Do not produce essays.
+البحث: ${researchInput?.primaryProblem || ''} - ${researchInput?.desiredOutcome || ''}
+وعد الـLead Magnet: ${leadMagnet?.promiseStatement?.fullPromiseAr || ''}`;
 
   const result = await AIProviderManager.generateStructured({
     task: 'GENERATE_PAGES_STRATEGY',
@@ -1092,250 +1036,106 @@ app.post('/api/build/pages', async (req, res) => {
               'isRecommended'
             ]
           }
-        },
-        landingPage: {
-          type: Type.OBJECT,
-          properties: {
-            selectedHeadlineId: { type: Type.STRING },
-            headlineAr: { type: Type.STRING },
-            subheadlineAr: { type: Type.STRING },
-            supportingCopyAr: { type: Type.STRING },
-            whatYouGetBullets: { type: Type.ARRAY, items: { type: Type.STRING } },
-            whyItMattersAr: { type: Type.STRING },
-            whoItIsForAr: { type: Type.ARRAY, items: { type: Type.STRING } },
-            whoItIsNotForAr: { type: Type.ARRAY, items: { type: Type.STRING } },
-            credibilityPlaceholderAr: { type: Type.STRING },
-            ctaButtonTextAr: { type: Type.STRING },
-            privacyMicrocopyAr: { type: Type.STRING },
-            objectionHandlingAr: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  objection: { type: Type.STRING },
-                  response: { type: Type.STRING }
-                },
-                required: ['objection', 'response']
-              }
-            },
-            faqItems: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  question: { type: Type.STRING },
-                  answer: { type: Type.STRING }
-                },
-                required: ['question', 'answer']
-              }
-            },
-            mobileNotesAr: { type: Type.ARRAY, items: { type: Type.STRING } }
-          },
-          required: [
-            'headlineAr',
-            'subheadlineAr',
-            'supportingCopyAr',
-            'whatYouGetBullets',
-            'whyItMattersAr',
-            'whoItIsForAr',
-            'whoItIsNotForAr',
-            'credibilityPlaceholderAr',
-            'ctaButtonTextAr',
-            'privacyMicrocopyAr',
-            'objectionHandlingAr',
-            'faqItems',
-            'mobileNotesAr'
-          ]
-        },
-        thankYouPage: {
-          type: Type.OBJECT,
-          properties: {
-            primaryObjectiveAr: { type: Type.STRING },
-            deliveryInstructionAr: { type: Type.STRING },
-            expectationSettingAr: { type: Type.STRING },
-            microCommitmentAskAr: { type: Type.STRING },
-            offerPreFrameAr: { type: Type.STRING },
-            whitelistInstructionAr: { type: Type.STRING },
-            nextStepCtaAr: { type: Type.STRING }
-          },
-          required: [
-            'primaryObjectiveAr',
-            'deliveryInstructionAr',
-            'expectationSettingAr',
-            'microCommitmentAskAr',
-            'offerPreFrameAr',
-            'whitelistInstructionAr',
-            'nextStepCtaAr'
-          ]
-        },
-        bridgePage: {
-          type: Type.OBJECT,
-          properties: {
-            isStrategicallyRequired: { type: Type.BOOLEAN },
-            problemRecapAr: { type: Type.STRING },
-            whatToLookForAr: { type: Type.STRING },
-            whySolutionCategoryMattersAr: { type: Type.STRING },
-            productIntroductionAr: { type: Type.STRING },
-            pros: { type: Type.ARRAY, items: { type: Type.STRING } },
-            potentialLimitations: { type: Type.ARRAY, items: { type: Type.STRING } },
-            whoItSuitsAr: { type: Type.ARRAY, items: { type: Type.STRING } },
-            whoItMayNotSuitAr: { type: Type.ARRAY, items: { type: Type.STRING } },
-            ctaTextAr: { type: Type.STRING },
-            affiliateDisclosureAr: { type: Type.STRING }
-          },
-          required: [
-            'isStrategicallyRequired',
-            'problemRecapAr',
-            'whatToLookForAr',
-            'whySolutionCategoryMattersAr',
-            'productIntroductionAr',
-            'pros',
-            'potentialLimitations',
-            'whoItSuitsAr',
-            'whoItMayNotSuitAr',
-            'ctaTextAr',
-            'affiliateDisclosureAr'
-          ]
-        },
-        reviewComparisonPage: {
-          type: Type.OBJECT,
-          properties: {
-            isIncluded: { type: Type.BOOLEAN },
-            pageType: { type: Type.STRING },
-            decisionCriteria: { type: Type.ARRAY, items: { type: Type.STRING } },
-            featureComparisonRows: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  feature: { type: Type.STRING },
-                  offerNote: { type: Type.STRING },
-                  alternativeNote: { type: Type.STRING }
-                },
-                required: ['feature', 'offerNote', 'alternativeNote']
-              }
-            },
-            useCasesAr: { type: Type.ARRAY, items: { type: Type.STRING } },
-            limitationsAr: { type: Type.ARRAY, items: { type: Type.STRING } },
-            pricingVerificationNoteAr: { type: Type.STRING },
-            affiliateDisclosureAr: { type: Type.STRING },
-            ctaAr: { type: Type.STRING }
-          },
-          required: [
-            'isIncluded',
-            'pageType',
-            'decisionCriteria',
-            'featureComparisonRows',
-            'useCasesAr',
-            'limitationsAr',
-            'pricingVerificationNoteAr',
-            'affiliateDisclosureAr',
-            'ctaAr'
-          ]
         }
       },
-      required: [
-        'pagePurposeMap',
-        'headlineOptions',
-        'landingPage',
-        'thankYouPage',
-        'bridgePage',
-        'reviewComparisonPage'
-      ]
+      required: ['pagePurposeMap', 'headlineOptions']
     },
     connectionConfig: config,
-    requestId
+    requestId,
+    timeoutMs: 35000
   });
-
-  if (result.success && result.data) {
-    if (result.data.landingPage) result.data.landingPage.status = 'REVIEW';
-    if (result.data.thankYouPage) result.data.thankYouPage.status = 'REVIEW';
-    if (result.data.bridgePage) result.data.bridgePage.status = 'REVIEW';
-    result.data.claimsAudit = [];
-  }
 
   return res.json(result);
 });
 
-// 6. Stage 5 — Email System (Supports: mode: 'email_strategy' | mode: 'email_details')
+// 6. Stage 5 — Email System (Supports: mode: 'email_strategy' | mode: 'email_copy')
 app.post('/api/build/email', async (req, res) => {
   const requestId = generateRequestId('req_email');
   const config = extractConnectionConfig(req);
-  const { researchInput, leadMagnet, pages, emailSystem, mode = 'email_strategy' } = req.body;
+  const {
+    researchInput,
+    leadMagnet,
+    emailNumber = 1,
+    blueprintItem,
+    strategySummary,
+    mode = 'email_strategy'
+  } = req.body;
 
-  if (mode === 'email_details') {
-    const prompt = `أنت كاتب إيميلات احترافي (Direct-Response Email Copywriter). قم بصياغة نصوص الإيميلات الكاملة لجميع الإيميلات الواردة في المخطط بالعربية الطبيعية، بدون حشو، مع 3 خيارات عناوين لكل إيميل وفحص التضليل:
-البحث: ${JSON.stringify(researchInput)}
-المخطط المعتمد: ${JSON.stringify(emailSystem?.blueprint || [])}
-وعد الـLead Magnet: ${JSON.stringify(leadMagnet?.promiseStatement)}`;
+  // Phase B: email_copy — GENERATES ONLY ONE EMAIL PER REQUEST!
+  if (mode === 'email_copy') {
+    const prompt = `أنت كاتب إيميلات احترافي (Direct-Response Email Copywriter).
+قم بصياغة نص الإيميل رقم ${emailNumber} فقط بالعربية الطبيعية بدون حشو، مع 3 خيارات عناوين وفحص التضليل:
+مخطط هذا الإيميل: ${JSON.stringify(blueprintItem || { emailNumber })}
+ملخص الاستراتيجية: ${strategySummary || ''}
+وعد الـLead Magnet: ${leadMagnet?.promiseStatement?.fullPromiseAr || ''}
+Keep every explanation concise. Maximum 1–2 short sentences per field.`;
 
     const result = await AIProviderManager.generateStructured({
-      task: 'GENERATE_EMAIL_DETAILS',
+      task: 'GENERATE_SINGLE_EMAIL_COPY',
       systemInstruction: SYSTEM_BASE_PROMPT,
       prompt,
       schema: {
         type: Type.OBJECT,
         properties: {
-          emailsCopy: {
+          emailNumber: { type: Type.INTEGER },
+          subjectLineAr: { type: Type.STRING },
+          subjectOptions: {
             type: Type.ARRAY,
             items: {
               type: Type.OBJECT,
               properties: {
-                emailNumber: { type: Type.INTEGER },
-                subjectLineAr: { type: Type.STRING },
-                subjectOptions: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      mechanismEn: { type: Type.STRING },
-                      mechanismAr: { type: Type.STRING },
-                      subjectAr: { type: Type.STRING },
-                      isDeceptiveRisk: { type: Type.BOOLEAN }
-                    },
-                    required: ['mechanismEn', 'mechanismAr', 'subjectAr', 'isDeceptiveRisk']
-                  }
-                },
-                previewTextAr: { type: Type.STRING },
-                openingAr: { type: Type.STRING },
-                bodyAr: { type: Type.STRING },
-                ctaTextAr: { type: Type.STRING },
-                psTextAr: { type: Type.STRING }
+                mechanismEn: { type: Type.STRING },
+                mechanismAr: { type: Type.STRING },
+                subjectAr: { type: Type.STRING },
+                isDeceptiveRisk: { type: Type.BOOLEAN }
               },
-              required: [
-                'emailNumber',
-                'subjectLineAr',
-                'subjectOptions',
-                'previewTextAr',
-                'openingAr',
-                'bodyAr',
-                'ctaTextAr',
-                'psTextAr'
-              ]
+              required: ['mechanismEn', 'mechanismAr', 'subjectAr', 'isDeceptiveRisk']
             }
-          }
+          },
+          previewTextAr: { type: Type.STRING },
+          openingAr: { type: Type.STRING },
+          bodyAr: { type: Type.STRING },
+          ctaTextAr: { type: Type.STRING },
+          psTextAr: { type: Type.STRING }
         },
-        required: ['emailsCopy']
+        required: [
+          'emailNumber',
+          'subjectLineAr',
+          'subjectOptions',
+          'previewTextAr',
+          'openingAr',
+          'bodyAr',
+          'ctaTextAr',
+          'psTextAr'
+        ]
       },
       connectionConfig: config,
-      requestId
+      requestId,
+      timeoutMs: 40000
     });
 
-    if (result.success && result.data && Array.isArray(result.data.emailsCopy)) {
-      result.data.emailsCopy = result.data.emailsCopy.map((e: any) => ({
-        ...e,
-        status: 'REVIEW'
-      }));
+    if (result.success && result.data) {
+      result.data.emailNumber = Number(emailNumber);
+      result.data.status = 'DRAFT';
+      return res.json({
+        success: true,
+        requestId,
+        data: {
+          emailNumber: Number(emailNumber),
+          email: result.data
+        }
+      });
     }
 
     return res.json(result);
   }
 
   // Phase A: email_strategy (Fast Decision First)
-  const prompt = `بناءً على مدخلات البحث والـLead Magnet، حدد استراتيجية الإيميل وسبب اختيار الطول ومخطط السلسلة (Email Blueprint) مع مسودات أولية سريعة:
-البحث: ${JSON.stringify(researchInput)}
-وعد الـLead Magnet: ${JSON.stringify(leadMagnet?.promiseStatement)}
-صفحة الجسر: ${JSON.stringify(pages?.bridgePage?.productIntroductionAr)}`;
+  // MUST RETURN ONLY: strategy, journeyStepsUsed, blueprint, personalizationFieldsUsed. NO emailsCopy!
+  const prompt = `بناءً على البحث والـLead Magnet، حدد استراتيجية الإيميل ومخطط السلسلة (Email Blueprint) المكون من 4 إلى 6 إيميلات.
+Keep every explanation concise. Maximum 1–2 short sentences per explanatory field. Do not produce essays.
+البحث: ${researchInput?.primaryProblem || ''}
+وعد الـLead Magnet: ${leadMagnet?.promiseStatement?.fullPromiseAr || ''}`;
 
   const result = await AIProviderManager.generateStructured({
     task: 'GENERATE_EMAIL_STRATEGY',
@@ -1396,64 +1196,24 @@ app.post('/api/build/email', async (req, res) => {
             ]
           }
         },
-        emailsCopy: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              emailNumber: { type: Type.INTEGER },
-              subjectLineAr: { type: Type.STRING },
-              subjectOptions: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    mechanismEn: { type: Type.STRING },
-                    mechanismAr: { type: Type.STRING },
-                    subjectAr: { type: Type.STRING },
-                    isDeceptiveRisk: { type: Type.BOOLEAN }
-                  },
-                  required: ['mechanismEn', 'mechanismAr', 'subjectAr', 'isDeceptiveRisk']
-                }
-              },
-              previewTextAr: { type: Type.STRING },
-              openingAr: { type: Type.STRING },
-              bodyAr: { type: Type.STRING },
-              ctaTextAr: { type: Type.STRING },
-              psTextAr: { type: Type.STRING }
-            },
-            required: [
-              'emailNumber',
-              'subjectLineAr',
-              'subjectOptions',
-              'previewTextAr',
-              'openingAr',
-              'bodyAr',
-              'ctaTextAr',
-              'psTextAr'
-            ]
-          }
-        },
         personalizationFieldsUsed: { type: Type.ARRAY, items: { type: Type.STRING } }
       },
       required: [
         'strategy',
         'journeyStepsUsed',
         'blueprint',
-        'emailsCopy',
         'personalizationFieldsUsed'
       ]
     },
     connectionConfig: config,
-    requestId
+    requestId,
+    timeoutMs: 35000
   });
 
+  // Critical: blueprintApprovedByStudent must NEVER be automatically set to true.
   if (result.success && result.data) {
-    result.data.blueprintApprovedByStudent = true;
-    result.data.emailsCopy = (result.data.emailsCopy || []).map((e: any) => ({
-      ...e,
-      status: 'REVIEW'
-    }));
+    result.data.blueprintApprovedByStudent = false;
+    result.data.emailsCopy = [];
     result.data.emailClaimsAudit = [];
   }
 
@@ -1472,12 +1232,13 @@ app.post('/api/build/automation', async (req, res) => {
     mode = 'automation_strategy'
   } = req.body;
 
+  // Phase B: automation_details — Generates detailed workflow nodes and platform notes on demand
   if (mode === 'automation_details') {
     const prompt = `أنت مهندس الأتمتة المعماري (Automation Architect). قم بتصميم تفاصيل عقد سير العمل (Workflow Nodes) والترجمة التقنية لمنصة ${selectedPlatform}:
 المنصة المختارة: ${selectedPlatform}
-البحث: ${JSON.stringify(researchInput)}
+البحث: ${researchInput?.primaryProblem || ''}
 عدد الإيميلات: ${emailSystem?.blueprint?.length || 5}
-التاجات المعتمدة: ${JSON.stringify(emailSystem?.strategy?.whyUserJoined || '')}`;
+Keep every explanation concise. Maximum 1–2 short sentences per explanatory field. Do not produce essays.`;
 
     const result = await AIProviderManager.generateStructured({
       task: 'GENERATE_AUTOMATION_DETAILS',
@@ -1511,17 +1272,19 @@ app.post('/api/build/automation', async (req, res) => {
         required: ['workflowNodes', 'platformTranslationNotesAr']
       },
       connectionConfig: config,
-      requestId
+      requestId,
+      timeoutMs: 40000
     });
 
     return res.json(result);
   }
 
   // Phase A: automation_strategy (Fast Decision First)
+  // MUST RETURN ONLY: triggers, conditions, actions, delays, exitConditions, goals, fallbackPaths, tags, segments. NO workflowNodes!
   const prompt = `صمّم نظام الأتمتة والتاجات القياسي (SOURCE, LEAD, ENGAGED, INTENT, CUSTOMER, STAGE) وشروط الخروج الآمنة بسرعة ودقة:
 المنصة المختارة: ${selectedPlatform}
-البحث: ${JSON.stringify(researchInput)}
-وعد الـLead Magnet: ${JSON.stringify(leadMagnet?.promiseStatement?.fullPromiseAr)}
+Keep every explanation concise. Maximum 1–2 short sentences per explanatory field. Do not produce essays.
+البحث: ${researchInput?.primaryProblem || ''}
 عدد الإيميلات: ${emailSystem?.blueprint?.length || 5}`;
 
   const result = await AIProviderManager.generateStructured({
@@ -1538,26 +1301,6 @@ app.post('/api/build/automation', async (req, res) => {
         exitConditions: { type: Type.ARRAY, items: { type: Type.STRING } },
         goals: { type: Type.ARRAY, items: { type: Type.STRING } },
         fallbackPaths: { type: Type.ARRAY, items: { type: Type.STRING } },
-        workflowNodes: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              id: { type: Type.STRING },
-              order: { type: Type.INTEGER },
-              stepType: {
-                type: Type.STRING,
-                description: 'TRIGGER, ACTION, DELAY, CONDITION, GOAL, or EXIT'
-              },
-              titleAr: { type: Type.STRING },
-              detailAr: { type: Type.STRING },
-              yesBranchAr: { type: Type.STRING },
-              noBranchAr: { type: Type.STRING },
-              tagInvolved: { type: Type.STRING }
-            },
-            required: ['id', 'order', 'stepType', 'titleAr', 'detailAr']
-          }
-        },
         tags: {
           type: Type.ARRAY,
           items: {
@@ -1585,8 +1328,7 @@ app.post('/api/build/automation', async (req, res) => {
             },
             required: ['dimension', 'conditionAr', 'howMessagingChangesAr']
           }
-        },
-        platformTranslationNotesAr: { type: Type.ARRAY, items: { type: Type.STRING } }
+        }
       },
       required: [
         'triggers',
@@ -1596,18 +1338,19 @@ app.post('/api/build/automation', async (req, res) => {
         'exitConditions',
         'goals',
         'fallbackPaths',
-        'workflowNodes',
         'tags',
-        'segments',
-        'platformTranslationNotesAr'
+        'segments'
       ]
     },
     connectionConfig: config,
-    requestId
+    requestId,
+    timeoutMs: 35000
   });
 
   if (result.success && result.data) {
     result.data.selectedPlatform = selectedPlatform;
+    result.data.workflowNodes = [];
+    result.data.platformTranslationNotesAr = [];
     result.data.safetyChecks = [];
   }
 

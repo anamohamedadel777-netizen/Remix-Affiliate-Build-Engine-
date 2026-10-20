@@ -448,8 +448,33 @@ export default function App() {
         selectedStepOrder: stepOrder,
         researchInput: project.researchInput
       },
-      (_data) => {
-        // Detailed insights loaded
+      (data) => {
+        if (!data) return;
+        const targetStep = typeof data.stepOrder === 'number' ? data.stepOrder : stepOrder;
+        setProject((prev) => {
+          if (!prev.customerJourney) return prev;
+          const updatedSteps = (prev.customerJourney.journeySteps || []).map((step) => {
+            if (step.stepOrder === targetStep) {
+              return {
+                ...step,
+                details: {
+                  deepMindsetAnalysisAr: data.deepMindsetAnalysisAr || '',
+                  recommendedFrictionReducersAr: Array.isArray(data.recommendedFrictionReducersAr) ? data.recommendedFrictionReducersAr : [],
+                  trustSignalsNeededAr: Array.isArray(data.trustSignalsNeededAr) ? data.trustSignalsNeededAr : [],
+                  microCommitmentAdviceAr: data.microCommitmentAdviceAr || ''
+                }
+              };
+            }
+            return step;
+          });
+          return {
+            ...prev,
+            customerJourney: {
+              ...prev.customerJourney,
+              journeySteps: updatedSteps
+            }
+          };
+        });
       }
     );
   };
@@ -616,59 +641,101 @@ export default function App() {
     );
   };
 
-  // Phase B: On-demand Page Details (Complete copy for all pages with selected headline)
-  const handleGeneratePagesDetails = async () => {
+  // Phase B: Single page copy on-demand (landing, thank-you, bridge, comparison)
+  const handleGeneratePageCopy = async (
+    pageId: 'landing' | 'thank-you' | 'bridge' | 'comparison'
+  ) => {
     if (!project.pages) return;
+    const pageLabels: Record<string, string> = {
+      landing: 'صفحة الهبوط',
+      'thank-you': 'صفحة الشكر',
+      bridge: 'صفحة الجسر',
+      comparison: 'صفحة المقارنة'
+    };
     await runAiOperation<any>(
-      'بنصيغ النصوص الكاملة لصفحة الهبوط والشكر والجسر...',
+      `بنصيغ نصوص ${pageLabels[pageId] || 'الصفحة'}...`,
       '/api/build/pages',
       {
-        mode: 'page_details',
-        selectedHeadlineId: project.pages.landingPage.selectedHeadlineId,
-        headlineText: project.pages.landingPage.headlineAr,
+        mode: 'page_copy',
+        pageId,
+        selectedHeadlineId: project.pages.landingPage?.selectedHeadlineId,
+        headlineText: project.pages.landingPage?.headlineAr,
         researchInput: project.researchInput,
         leadMagnet: project.leadMagnet,
         proofLibrary: project.proofLibrary
       },
-      (detailsData) => {
+      (resData) => {
+        const pageContent =
+          resData?.pageData ||
+          resData?.landingPage ||
+          resData?.thankYouPage ||
+          resData?.bridgePage ||
+          resData?.reviewComparisonPage ||
+          resData;
+        const targetId = resData?.pageId || pageId;
+
         setProject((prev) => {
           if (!prev.pages) return prev;
+          const updatedPages = { ...prev.pages };
+          if (targetId === 'landing') {
+            updatedPages.landingPage = {
+              ...(prev.pages.landingPage || {
+                selectedHeadlineId: '',
+                headlineAr: '',
+                subheadlineAr: '',
+                supportingCopyAr: '',
+                whatYouGetBullets: [],
+                whyItMattersAr: '',
+                whoItIsForAr: [],
+                whoItIsNotForAr: [],
+                credibilityPlaceholderAr: '',
+                ctaButtonTextAr: '',
+                privacyMicrocopyAr: '',
+                objectionHandlingAr: [],
+                faqItems: [],
+                mobileNotesAr: []
+              }),
+              ...pageContent,
+              headlineAr:
+                prev.lockedElements.headline && prev.pages.landingPage
+                  ? prev.pages.landingPage.headlineAr
+                  : pageContent.headlineAr || prev.pages.landingPage?.headlineAr || '',
+              ctaButtonTextAr:
+                prev.lockedElements.mainCta && prev.pages.landingPage
+                  ? prev.pages.landingPage.ctaButtonTextAr
+                  : pageContent.ctaButtonTextAr || prev.pages.landingPage?.ctaButtonTextAr || '',
+              status: 'REVIEW' as CopyStatus
+            };
+          } else if (targetId === 'thank-you') {
+            updatedPages.thankYouPage = {
+              ...(prev.pages.thankYouPage || {}),
+              ...pageContent,
+              status: 'REVIEW' as CopyStatus
+            };
+          } else if (targetId === 'bridge') {
+            updatedPages.bridgePage = {
+              ...(prev.pages.bridgePage || {}),
+              ...pageContent,
+              status: 'REVIEW' as CopyStatus
+            };
+          } else if (targetId === 'comparison') {
+            updatedPages.reviewComparisonPage = {
+              ...(prev.pages.reviewComparisonPage || {}),
+              ...pageContent
+            };
+          }
           return {
             ...prev,
-            pages: {
-              ...prev.pages,
-              landingPage: {
-                ...prev.pages.landingPage,
-                ...detailsData.landingPage,
-                headlineAr:
-                  prev.lockedElements.headline && prev.pages
-                    ? prev.pages.landingPage.headlineAr
-                    : detailsData.landingPage?.headlineAr || prev.pages.landingPage.headlineAr,
-                ctaButtonTextAr:
-                  prev.lockedElements.mainCta && prev.pages
-                    ? prev.pages.landingPage.ctaButtonTextAr
-                    : detailsData.landingPage?.ctaButtonTextAr || prev.pages.landingPage.ctaButtonTextAr,
-                status: 'REVIEW' as CopyStatus
-              },
-              thankYouPage: {
-                ...prev.pages.thankYouPage,
-                ...detailsData.thankYouPage,
-                status: 'REVIEW' as CopyStatus
-              },
-              bridgePage: {
-                ...prev.pages.bridgePage,
-                ...detailsData.bridgePage,
-                status: 'REVIEW' as CopyStatus
-              },
-              reviewComparisonPage: {
-                ...prev.pages.reviewComparisonPage,
-                ...detailsData.reviewComparisonPage
-              }
-            }
+            pages: updatedPages
           };
         });
       }
     );
+  };
+
+  // Phase B: On-demand Page Details
+  const handleGeneratePagesDetails = async () => {
+    await handleGeneratePageCopy('landing');
   };
 
   const handleRegenerateHeadlinesOnly = async () => {
@@ -750,6 +817,58 @@ export default function App() {
         }
       }
     );
+  };
+
+  // Phase B: Single Email Copy on-demand (email_copy)
+  const handleGenerateSingleEmail = async (emailNumber = 1) => {
+    if (project.lockedElements.emailSequence || !project.emailSystem) return;
+    const blueprintItem =
+      project.emailSystem.blueprint.find((b) => b.emailNumber === emailNumber) || {
+        emailNumber
+      };
+    await runAiOperation<any>(
+      `بنكتب نص الإيميل رقم 0${emailNumber}...`,
+      '/api/build/email',
+      {
+        mode: 'email_copy',
+        emailNumber,
+        blueprintItem,
+        strategySummary: project.emailSystem.strategy?.desiredBehavior,
+        researchInput: project.researchInput,
+        leadMagnet: project.leadMagnet
+      },
+      (data) => {
+        const emailResult: GeneratedEmailCopy = data?.email || data;
+        setProject((prev) => {
+          if (!prev.emailSystem) return prev;
+          const currentEmails = prev.emailSystem.emailsCopy || [];
+          const exists = currentEmails.some((e) => e.emailNumber === emailNumber);
+          const updatedEmails = exists
+            ? currentEmails.map((e) => (e.emailNumber === emailNumber ? emailResult : e))
+            : [...currentEmails, emailResult].sort((a, b) => a.emailNumber - b.emailNumber);
+          return {
+            ...prev,
+            emailSystem: {
+              ...prev.emailSystem,
+              emailsCopy: updatedEmails
+            }
+          };
+        });
+      }
+    );
+  };
+
+  const handleConfirmEmailBlueprint = () => {
+    setProject((prev) => {
+      if (!prev.emailSystem) return prev;
+      return {
+        ...prev,
+        emailSystem: {
+          ...prev.emailSystem,
+          blueprintApprovedByStudent: true
+        }
+      };
+    });
   };
 
   const handleRewriteSingleEmail = async (emailNumber: number) => {
@@ -1014,6 +1133,7 @@ export default function App() {
             <Stage2JourneyAndMessageMatch
               journey={project.customerJourney}
               onGenerateJourney={handleGenerateJourney}
+              onGenerateJourneyDetails={handleGenerateJourneyDetails}
               onUpdateMessageChain={(
                 updatedChain: MessageMatchLink[],
                 overallStatus: 'ALIGNED' | 'MESSAGE MISMATCH',
@@ -1042,6 +1162,7 @@ export default function App() {
             <Stage3FunnelStrategy
               funnelStrategy={project.funnelStrategy}
               onGenerateFunnel={handleGenerateFunnel}
+              onExpandFunnelDetails={handleExpandFunnelDetails}
               onSelectPrimaryFunnel={(modelId) => {
                 if (project.lockedElements.funnel) return;
                 setProject((prev) => {
@@ -1082,6 +1203,7 @@ export default function App() {
             <Stage4LeadMagnet
               leadMagnet={project.leadMagnet}
               onGenerateLeadMagnet={handleGenerateLeadMagnet}
+              onGenerateLeadMagnetDetails={handleGenerateLeadMagnetDetails}
               onSelectConcept={(conceptId) => {
                 if (project.lockedElements.leadMagnet) return;
                 setProject((prev) => {
@@ -1137,6 +1259,8 @@ export default function App() {
               project={project}
               pages={project.pages}
               onGeneratePages={handleGeneratePages}
+              onGeneratePagesDetails={handleGeneratePagesDetails}
+              onGeneratePageCopy={handleGeneratePageCopy}
               onRegenerateHeadlines={handleRegenerateHeadlinesOnly}
               onSelectHeadline={(headlineId, headlineText) => {
                 if (project.lockedElements.headline) return;
@@ -1201,6 +1325,9 @@ export default function App() {
             <Stage6EmailSystem
               emailSystem={project.emailSystem}
               onGenerateEmailSystem={handleGenerateEmailSystem}
+              onGenerateAllEmailsCopy={handleGenerateAllEmailsCopy}
+              onGenerateSingleEmail={handleGenerateSingleEmail}
+              onConfirmBlueprint={handleConfirmEmailBlueprint}
               onRewriteSingleEmail={handleRewriteSingleEmail}
               onUpdateEmailCopy={(
                 emailNumber: number,
@@ -1212,7 +1339,7 @@ export default function App() {
                         ...prev,
                         emailSystem: {
                           ...prev.emailSystem,
-                          emailsCopy: prev.emailSystem.emailsCopy.map((em) =>
+                          emailsCopy: (prev.emailSystem.emailsCopy || []).map((em) =>
                             em.emailNumber === emailNumber
                               ? { ...em, ...patch }
                               : em
@@ -1233,6 +1360,7 @@ export default function App() {
             <Stage7AutomationArchitect
               automation={project.automation}
               onGenerateAutomation={handleGenerateAutomation}
+              onExpandAutomationDetails={handleExpandAutomationDetails}
               onSelectPlatform={(platform) => {
                 setProject((prev) =>
                   prev.automation

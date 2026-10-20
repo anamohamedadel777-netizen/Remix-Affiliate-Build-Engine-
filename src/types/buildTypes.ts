@@ -121,6 +121,13 @@ export interface ReadinessCheckResult {
   readinessScore: number;
 }
 
+export interface JourneyStepDetails {
+  deepMindsetAnalysisAr: string;
+  recommendedFrictionReducersAr: string[];
+  trustSignalsNeededAr: string[];
+  microCommitmentAdviceAr: string;
+}
+
 export interface JourneyNode {
   stepOrder: number;
   stageNameEn: string;
@@ -128,6 +135,7 @@ export interface JourneyNode {
   visitorMindset: string;
   messageFocus: string;
   recommendedAction: string;
+  details?: JourneyStepDetails;
 }
 
 export interface AwarenessStageGuide {
@@ -221,8 +229,8 @@ export interface FunnelStrategyData {
   whatMustBeTrueAr: string;
   doNotBuildYetAr: string[];
   confirmedByStudent: boolean;
-  funnelMapNodes: FunnelMapNode[];
-  minimumViableFunnel: MinimumViableFunnelPlan;
+  funnelMapNodes?: FunnelMapNode[];
+  minimumViableFunnel?: MinimumViableFunnelPlan;
 }
 
 export interface LeadMagnetScores {
@@ -273,19 +281,19 @@ export interface LeadMagnetData {
   concepts: LeadMagnetConcept[];
   selectedConceptId: string;
   confirmedByStudent: boolean;
-  promiseStatement: {
+  promiseStatement?: {
     specificProblem: string;
     usefulOutcome: string;
     reasonableTimeEffort: string;
     fullPromiseAr: string;
     status: CopyStatus;
   };
-  contentArchitecture: {
+  contentArchitecture?: {
     formatType: string;
     sections: LeadMagnetArchitectureSection[];
     ctaInsideAsset: string;
   };
-  offerBridge: LeadMagnetBridge;
+  offerBridge?: LeadMagnetBridge;
 }
 
 export interface PagePurposeItem {
@@ -387,11 +395,11 @@ export interface ReviewComparisonArchitecture {
 export interface PagesData {
   pagePurposeMap: PagePurposeItem[];
   headlineOptions: HeadlineOption[];
-  landingPage: LandingPageArchitecture;
-  thankYouPage: ThankYouPageArchitecture;
-  bridgePage: BridgePageArchitecture;
-  reviewComparisonPage: ReviewComparisonArchitecture;
-  claimsAudit: ClaimAuditItem[];
+  landingPage?: LandingPageArchitecture;
+  thankYouPage?: ThankYouPageArchitecture;
+  bridgePage?: BridgePageArchitecture;
+  reviewComparisonPage?: ReviewComparisonArchitecture;
+  claimsAudit?: ClaimAuditItem[];
 }
 
 export interface EmailBlueprintItem {
@@ -439,13 +447,13 @@ export interface EmailSystemData {
   journeyStepsUsed: string[];
   blueprintApprovedByStudent: boolean;
   blueprint: EmailBlueprintItem[];
-  emailsCopy: GeneratedEmailCopy[];
+  emailsCopy?: GeneratedEmailCopy[];
   personalizationFieldsUsed: string[];
-  emailClaimsAudit: ClaimAuditItem[];
+  emailClaimsAudit?: ClaimAuditItem[];
 }
 
 export interface TagDefinition {
-  tagName: string; // e.g., SOURCE | YouTube
+  tagName: string;
   category: 'SOURCE' | 'LEAD' | 'ENGAGED' | 'INTENT' | 'CUSTOMER' | 'STAGE';
   purposeAr: string;
   appliedWhenAr: string;
@@ -483,11 +491,11 @@ export interface AutomationData {
   exitConditions: string[];
   goals: string[];
   fallbackPaths: string[];
-  workflowNodes: AutomationStepNode[];
+  workflowNodes?: AutomationStepNode[];
   tags: TagDefinition[];
   segments: SegmentationRule[];
-  safetyChecks: AutomationSafetyCheck[];
-  platformTranslationNotesAr: string[];
+  safetyChecks?: AutomationSafetyCheck[];
+  platformTranslationNotesAr?: string[];
 }
 
 export interface CtaMapRow {

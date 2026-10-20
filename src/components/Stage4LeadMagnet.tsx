@@ -203,179 +203,210 @@ export const Stage4LeadMagnet: React.FC<Stage4LeadMagnetProps> = ({
         </div>
       </div>
 
-      {/* Lead Magnet Promise Builder */}
-      <div className="bg-[#0C0B0E] border border-[#F5BF1E]/30 rounded-xl p-6 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-bold text-[#FCFCFA]">
-              صياغة الوعد الأساسي للـLead Magnet (Promise Statement)
-            </h2>
-            <p className="text-xs text-[#A39E93]">
-              مشكلة محددة + نتيجة مفيدة + وقت وجهد منطقي بدون ادعاءات مبالغ فيها.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <select
-              value={leadMagnet.promiseStatement.status}
-              onChange={(e) =>
-                onUpdatePromise(
-                  leadMagnet.promiseStatement.fullPromiseAr,
-                  e.target.value as CopyStatus
-                )
-              }
-              className="bg-[#141216] border border-white/15 rounded-lg px-2.5 py-1.5 text-xs text-[#FBD052] font-mono"
-            >
-              <option value="DRAFT">DRAFT</option>
-              <option value="REVIEW">REVIEW</option>
-              <option value="APPROVED">APPROVED</option>
-              <option value="NEEDS EVIDENCE">NEEDS EVIDENCE</option>
-            </select>
-
-            <button
-              type="button"
-              onClick={onTogglePromiseLock}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border flex items-center gap-1 ${
-                isPromiseLocked
-                  ? 'bg-[#23170D] border-[#F5BF1E] text-[#FBD052]'
-                  : 'bg-[#141216] border-white/15 text-[#A39E93]'
-              }`}
-            >
-              {isPromiseLocked ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
-              <span>{isPromiseLocked ? 'الوعد مقفل' : 'قفل الوعد'}</span>
-            </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-          <div className="bg-[#141216] p-3.5 rounded-lg border border-white/8">
-            <div className="text-[#F5BF1E] font-bold mb-1">1. المشكلة المحددة</div>
-            <div className="text-[#FCFCFA]">{leadMagnet.promiseStatement.specificProblem}</div>
-          </div>
-          <div className="bg-[#141216] p-3.5 rounded-lg border border-white/8">
-            <div className="text-[#F5BF1E] font-bold mb-1">2. النتيجة المفيدة</div>
-            <div className="text-[#FCFCFA]">{leadMagnet.promiseStatement.usefulOutcome}</div>
-          </div>
-          <div className="bg-[#141216] p-3.5 rounded-lg border border-white/8">
-            <div className="text-[#F5BF1E] font-bold mb-1">3. الإطار الزمني والجهد المنطقي</div>
-            <div className="text-[#FCFCFA]">{leadMagnet.promiseStatement.reasonableTimeEffort}</div>
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-xs text-[#A39E93] mb-1.5">
-            الصياغة النهائية المعتمدة للوعد:
-          </label>
-          <textarea
-            rows={2}
-            disabled={isPromiseLocked}
-            value={leadMagnet.promiseStatement.fullPromiseAr}
-            onChange={(e) =>
-              onUpdatePromise(e.target.value, leadMagnet.promiseStatement.status)
-            }
-            className="w-full bg-[#141216] border border-white/15 rounded-lg p-3 text-sm text-[#FCFCFA] disabled:opacity-60 focus:outline-none focus:border-[#F5BF1E]"
-          />
-        </div>
-      </div>
-
-      {/* Lead Magnet Content Architecture */}
-      <div className="bg-[#0C0B0E] border border-white/10 rounded-xl p-6 space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-bold text-[#FCFCFA]">
-              الهيكل التفصيلي الجاهز للتنفيذ (Content Architecture)
-            </h2>
-            <p className="text-xs text-[#A39E93]">
-              نوع الهيكل: <bdi dir="ltr" className="text-[#F5BF1E] font-mono">{leadMagnet.contentArchitecture.formatType}</bdi>
-            </p>
-          </div>
+      {/* Lead Magnet Details (Phase B) or Placeholder */}
+      {!leadMagnet.promiseStatement ? (
+        <div className="bg-[#0C0B0E] border border-white/10 rounded-xl p-8 text-center space-y-4">
+          <Magnet className="w-10 h-10 text-[#F5BF1E] mx-auto" />
+          <h2 className="text-xl font-bold text-[#FCFCFA]">
+            تفاصيل بنية الـ Lead Magnet لم تُبنَ بعد
+          </h2>
+          <p className="text-xs text-[#A39E93] max-w-md mx-auto">
+            تم توليد مفاهيم الـLead Magnet وتقييمها بنجاح. حدد المفهوم الذي تود اعتماده، ثم اضغط لبناء صياغة الوعد وهيكلة المحتوى وجسر العرض.
+          </p>
           {onGenerateLeadMagnetDetails && (
             <button
               type="button"
               disabled={isGenerating}
               onClick={onGenerateLeadMagnetDetails}
-              className="px-3 py-1.5 bg-[#141216] hover:bg-[#23170D] border border-[#F5BF1E]/30 rounded-lg text-xs font-semibold text-[#FBD052] flex items-center gap-1.5 transition-colors"
+              className="px-5 py-2.5 bg-[#F5BF1E] hover:bg-[#FBD052] text-[#040405] font-bold text-xs rounded-lg inline-flex items-center gap-2 transition-colors"
             >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>توليد وتوسيع الهيكل والجسر للعرض</span>
+              <Sparkles className="w-4 h-4" />
+              <span>{isGenerating ? 'جاري بناء تفاصيل الـLead Magnet...' : 'بناء هيكل ووعد المغناطيس المختار'}</span>
             </button>
           )}
         </div>
-
-        <div className="space-y-4">
-          {leadMagnet.contentArchitecture.sections.map((sec, idx) => (
-            <div
-              key={idx}
-              className="bg-[#141216] border border-white/10 rounded-xl p-4 space-y-2.5"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-sm font-bold text-[#FBD052]">{sec.sectionNameAr}</h3>
-                <span className="text-xs font-mono text-[#A39E93]">
-                  <bdi dir="ltr">{sec.sectionRoleEn}</bdi>
-                </span>
+      ) : (
+        <>
+          {/* Lead Magnet Promise Builder */}
+          <div className="bg-[#0C0B0E] border border-[#F5BF1E]/30 rounded-xl p-6 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold text-[#FCFCFA]">
+                  صياغة الوعد الأساسي للـLead Magnet (Promise Statement)
+                </h2>
+                <p className="text-xs text-[#A39E93]">
+                  مشكلة محددة + نتيجة مفيدة + وقت وجهد منطقي بدون ادعاءات مبالغ فيها.
+                </p>
               </div>
-              <p className="text-xs text-[#D6D3CD]">{sec.detailsAr}</p>
-              <ul className="space-y-1.5 text-xs text-[#FCFCFA] pt-1">
-                {sec.actionableItems.map((item, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <span className="text-[#F5BF1E] font-bold">•</span>
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
+
+              <div className="flex items-center gap-2">
+                <select
+                  value={leadMagnet.promiseStatement.status}
+                  onChange={(e) =>
+                    onUpdatePromise(
+                      leadMagnet.promiseStatement?.fullPromiseAr || '',
+                      e.target.value as CopyStatus
+                    )
+                  }
+                  className="bg-[#141216] border border-white/15 rounded-lg px-2.5 py-1.5 text-xs text-[#FBD052] font-mono"
+                >
+                  <option value="DRAFT">DRAFT</option>
+                  <option value="REVIEW">REVIEW</option>
+                  <option value="APPROVED">APPROVED</option>
+                  <option value="NEEDS EVIDENCE">NEEDS EVIDENCE</option>
+                </select>
+
+                <button
+                  type="button"
+                  onClick={onTogglePromiseLock}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border flex items-center gap-1 ${
+                    isPromiseLocked
+                      ? 'bg-[#23170D] border-[#F5BF1E] text-[#FBD052]'
+                      : 'bg-[#141216] border-white/15 text-[#A39E93]'
+                  }`}
+                >
+                  {isPromiseLocked ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+                  <span>{isPromiseLocked ? 'الوعد مقفل' : 'قفل الوعد'}</span>
+                </button>
+              </div>
             </div>
-          ))}
-        </div>
 
-        <div className="bg-[#23170D] border border-[#F5BF1E]/30 rounded-lg p-4 text-xs">
-          <strong className="text-[#F5BF1E]">الـCTA المدمج داخل نهاية الـLead Magnet: </strong>
-          <span className="text-[#FCFCFA]">{leadMagnet.contentArchitecture.ctaInsideAsset}</span>
-        </div>
-      </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              <div className="bg-[#141216] p-3.5 rounded-lg border border-white/8">
+                <div className="text-[#F5BF1E] font-bold mb-1">1. المشكلة المحددة</div>
+                <div className="text-[#FCFCFA]">{leadMagnet.promiseStatement.specificProblem}</div>
+              </div>
+              <div className="bg-[#141216] p-3.5 rounded-lg border border-white/8">
+                <div className="text-[#F5BF1E] font-bold mb-1">2. النتيجة المفيدة</div>
+                <div className="text-[#FCFCFA]">{leadMagnet.promiseStatement.usefulOutcome}</div>
+              </div>
+              <div className="bg-[#141216] p-3.5 rounded-lg border border-white/8">
+                <div className="text-[#F5BF1E] font-bold mb-1">3. الإطار الزمني والجهد المنطقي</div>
+                <div className="text-[#FCFCFA]">{leadMagnet.promiseStatement.reasonableTimeEffort}</div>
+              </div>
+            </div>
 
-      {/* Lead Magnet -> Offer Bridge */}
-      <div className="bg-[#0C0B0E] border border-white/10 rounded-xl p-6 space-y-5">
-        <div className="flex items-center gap-2">
-          <Link2 className="w-5 h-5 text-[#F5BF1E]" />
-          <h2 className="text-lg font-bold text-[#FCFCFA]">
-            الجسر المنطقي من الـLead Magnet إلى العرض (Lead Magnet → Offer Bridge)
-          </h2>
-        </div>
+            <div>
+              <label className="block text-xs text-[#A39E93] mb-1.5">
+                الصياغة النهائية المعتمدة للوعد:
+              </label>
+              <textarea
+                rows={2}
+                disabled={isPromiseLocked}
+                value={leadMagnet.promiseStatement.fullPromiseAr}
+                onChange={(e) =>
+                  leadMagnet.promiseStatement &&
+                  onUpdatePromise(e.target.value, leadMagnet.promiseStatement.status)
+                }
+                className="w-full bg-[#141216] border border-white/15 rounded-lg p-3 text-sm text-[#FCFCFA] disabled:opacity-60 focus:outline-none focus:border-[#F5BF1E]"
+              />
+            </div>
+          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 text-xs">
-          <div className="bg-[#141216] p-3.5 rounded-xl border border-white/8 space-y-1">
-            <div className="text-[#F5BF1E] font-bold">1. مشكلة الـLead Magnet</div>
-            <p className="text-[#FCFCFA]">{leadMagnet.offerBridge.leadMagnetProblem}</p>
-          </div>
-          <div className="bg-[#141216] p-3.5 rounded-xl border border-white/8 space-y-1">
-            <div className="text-[#F5BF1E] font-bold">2. الإدراك المكتسب (Insight)</div>
-            <p className="text-[#FCFCFA]">{leadMagnet.offerBridge.insightDelivered}</p>
-          </div>
-          <div className="bg-[#141216] p-3.5 rounded-xl border border-white/8 space-y-1">
-            <div className="text-[#F5BF1E] font-bold">3. الفجوة المتبقية (Remaining Gap)</div>
-            <p className="text-[#FCFCFA]">{leadMagnet.offerBridge.remainingGap}</p>
-          </div>
-          <div className="bg-[#141216] p-3.5 rounded-xl border border-white/8 space-y-1">
-            <div className="text-[#F5BF1E] font-bold">4. فئة الحل (Solution Category)</div>
-            <p className="text-[#FCFCFA]">{leadMagnet.offerBridge.solutionCategory}</p>
-          </div>
-          <div className="bg-[#23170D] p-3.5 rounded-xl border border-[#F5BF1E]/40 space-y-1">
-            <div className="text-[#FBD052] font-bold">5. ارتباط العرض (Offer Fit)</div>
-            <p className="text-[#FCFCFA]">{leadMagnet.offerBridge.offerConnection}</p>
-          </div>
-        </div>
+          {/* Lead Magnet Content Architecture */}
+          {leadMagnet.contentArchitecture && (
+            <div className="bg-[#0C0B0E] border border-white/10 rounded-xl p-6 space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-bold text-[#FCFCFA]">
+                    الهيكل التفصيلي الجاهز للتنفيذ (Content Architecture)
+                  </h2>
+                  <p className="text-xs text-[#A39E93]">
+                    نوع الهيكل: <bdi dir="ltr" className="text-[#F5BF1E] font-mono">{leadMagnet.contentArchitecture.formatType}</bdi>
+                  </p>
+                </div>
+                {onGenerateLeadMagnetDetails && (
+                  <button
+                    type="button"
+                    disabled={isGenerating}
+                    onClick={onGenerateLeadMagnetDetails}
+                    className="px-3 py-1.5 bg-[#141216] hover:bg-[#23170D] border border-[#F5BF1E]/30 rounded-lg text-xs font-semibold text-[#FBD052] flex items-center gap-1.5 transition-colors"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>تحديث تفاصيل الـLead Magnet</span>
+                  </button>
+                )}
+              </div>
 
-        <div className="flex justify-end pt-2">
-          <button
-            type="button"
-            onClick={onProceedToPages}
-            className="px-6 py-3 bg-[#F5BF1E] hover:bg-[#FBD052] text-[#040405] font-bold text-sm rounded-lg flex items-center gap-2 transition-colors"
-          >
-            <span>الانتقال للمرحلة 5: هندسة الصفحات والنصوص</span>
-            <ArrowLeft className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
+              <div className="space-y-4">
+                {leadMagnet.contentArchitecture.sections.map((sec, idx) => (
+                  <div
+                    key={idx}
+                    className="bg-[#141216] border border-white/10 rounded-xl p-4 space-y-2.5"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h3 className="text-sm font-bold text-[#FBD052]">{sec.sectionNameAr}</h3>
+                      <span className="text-xs font-mono text-[#A39E93]">
+                        <bdi dir="ltr">{sec.sectionRoleEn}</bdi>
+                      </span>
+                    </div>
+                    <p className="text-xs text-[#D6D3CD]">{sec.detailsAr}</p>
+                    <ul className="space-y-1.5 text-xs text-[#FCFCFA] pt-1">
+                      {sec.actionableItems.map((item, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span className="text-[#F5BF1E] font-bold">•</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+
+              <div className="bg-[#23170D] border border-[#F5BF1E]/30 rounded-lg p-4 text-xs">
+                <strong className="text-[#F5BF1E]">الـCTA المدمج داخل نهاية الـLead Magnet: </strong>
+                <span className="text-[#FCFCFA]">{leadMagnet.contentArchitecture.ctaInsideAsset}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Lead Magnet -> Offer Bridge */}
+          {leadMagnet.offerBridge && (
+            <div className="bg-[#0C0B0E] border border-white/10 rounded-xl p-6 space-y-5">
+              <div className="flex items-center gap-2">
+                <Link2 className="w-5 h-5 text-[#F5BF1E]" />
+                <h2 className="text-lg font-bold text-[#FCFCFA]">
+                  الجسر المنطقي من الـLead Magnet إلى العرض (Lead Magnet → Offer Bridge)
+                </h2>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3 text-xs">
+                <div className="bg-[#141216] p-3.5 rounded-xl border border-white/8 space-y-1">
+                  <div className="text-[#F5BF1E] font-bold">1. مشكلة الـLead Magnet</div>
+                  <p className="text-[#FCFCFA]">{leadMagnet.offerBridge.leadMagnetProblem}</p>
+                </div>
+                <div className="bg-[#141216] p-3.5 rounded-xl border border-white/8 space-y-1">
+                  <div className="text-[#F5BF1E] font-bold">2. الإدراك المكتسب (Insight)</div>
+                  <p className="text-[#FCFCFA]">{leadMagnet.offerBridge.insightDelivered}</p>
+                </div>
+                <div className="bg-[#141216] p-3.5 rounded-xl border border-white/8 space-y-1">
+                  <div className="text-[#F5BF1E] font-bold">3. الفجوة المتبقية (Remaining Gap)</div>
+                  <p className="text-[#FCFCFA]">{leadMagnet.offerBridge.remainingGap}</p>
+                </div>
+                <div className="bg-[#141216] p-3.5 rounded-xl border border-white/8 space-y-1">
+                  <div className="text-[#F5BF1E] font-bold">4. فئة الحل (Solution Category)</div>
+                  <p className="text-[#FCFCFA]">{leadMagnet.offerBridge.solutionCategory}</p>
+                </div>
+                <div className="bg-[#23170D] p-3.5 rounded-xl border border-[#F5BF1E]/40 space-y-1">
+                  <div className="text-[#FBD052] font-bold">5. ارتباط العرض (Offer Fit)</div>
+                  <p className="text-[#FCFCFA]">{leadMagnet.offerBridge.offerConnection}</p>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={onProceedToPages}
+                  className="px-6 py-3 bg-[#F5BF1E] hover:bg-[#FBD052] text-[#040405] font-bold text-sm rounded-lg flex items-center gap-2 transition-colors"
+                >
+                  <span>الانتقال للمرحلة 5: هندسة الصفحات والنصوص</span>
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 };

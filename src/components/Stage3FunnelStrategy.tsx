@@ -275,129 +275,157 @@ export const Stage3FunnelStrategy: React.FC<Stage3FunnelStrategyProps> = ({
         </div>
       </div>
 
-      {/* Visual Funnel Map Nodes */}
-      <div className="bg-[#0C0B0E] border border-white/10 rounded-xl p-6 space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-bold text-[#FCFCFA]">
-              خريطة الفانل البصرية (Visual Funnel Map)
-            </h2>
-            <p className="text-xs text-[#A39E93]">
-              كل عقدة في الفانل لها وظيفة واحدة، وتجيب على سؤال واحد، وتدفع الزائر لخطوة واحدة.
-            </p>
-          </div>
+      {/* Visual Funnel Map Nodes & MVF (Phase B on-demand) */}
+      {!funnelStrategy.funnelMapNodes || funnelStrategy.funnelMapNodes.length === 0 ? (
+        <div className="bg-[#0C0B0E] border border-white/10 rounded-xl p-8 text-center space-y-4">
+          <Layers className="w-10 h-10 text-[#F5BF1E] mx-auto" />
+          <h2 className="text-xl font-bold text-[#FCFCFA]">
+            خريطة الفانل لم تُبنَ بعد
+          </h2>
+          <p className="text-xs text-[#A39E93] max-w-md mx-auto">
+            تمت مقارنة وتقييم نماذج الفانل بنجاح. راجع النماذج واعتمد الأنسب، ثم اضغط لبناء خريطة التدفق البصرية الكاملة وخطة الـMVF.
+          </p>
           {onExpandFunnelDetails && (
             <button
               type="button"
               disabled={isGenerating}
               onClick={onExpandFunnelDetails}
-              className="px-3 py-1.5 bg-[#141216] hover:bg-[#23170D] border border-[#F5BF1E]/30 rounded-lg text-xs font-semibold text-[#FBD052] flex items-center gap-1.5 transition-colors"
+              className="px-5 py-2.5 bg-[#F5BF1E] hover:bg-[#FBD052] text-[#040405] font-bold text-xs rounded-lg inline-flex items-center gap-2 transition-colors"
             >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>توليد وتوسيع تفاصيل خريطة الفانل والـMVF</span>
+              <Sparkles className="w-4 h-4" />
+              <span>{isGenerating ? 'جاري بناء خريطة الفانل والـMVF...' : 'بناء خريطة الفانل المختار'}</span>
             </button>
           )}
         </div>
-
-        <div className="space-y-3">
-          {funnelStrategy.funnelMapNodes.map((node, i) => (
-            <div key={node.id} className="space-y-2">
-              <div className="bg-[#141216] border border-white/10 rounded-xl p-4 grid grid-cols-1 lg:grid-cols-5 gap-4">
-                <div>
-                  <span className="text-xs font-mono text-[#F5BF1E]">
-                    خطوة <bdi dir="ltr">0{node.order}</bdi> · <bdi dir="ltr">{node.nodeTypeEn}</bdi>
-                  </span>
-                  <h3 className="text-sm font-bold text-[#FCFCFA] mt-0.5">
-                    {node.nodeTitleAr}
-                  </h3>
-                </div>
-                <div>
-                  <div className="text-[11px] text-[#A39E93]">الوظيفة (Purpose)</div>
-                  <div className="text-xs text-[#FCFCFA] mt-0.5">{node.purpose}</div>
-                </div>
-                <div>
-                  <div className="text-[11px] text-[#A39E93]">سؤال الزائر هنا</div>
-                  <div className="text-xs text-[#FBD052] mt-0.5">{node.visitorQuestion}</div>
-                </div>
-                <div>
-                  <div className="text-[11px] text-[#A39E93]">الرسالة والـCTA</div>
-                  <div className="text-xs text-[#FCFCFA] mt-0.5">{node.mainMessage}</div>
-                  <div className="text-xs text-emerald-400 font-semibold mt-1">
-                    CTA: {node.cta}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[11px] text-[#A39E93]">حدث التتبع (Tracking Event)</div>
-                  <div className="text-xs font-mono text-[#F5BF1E] mt-1">
-                    <bdi dir="ltr">{node.trackingEvent}</bdi>
-                  </div>
-                </div>
+      ) : (
+        <>
+          <div className="bg-[#0C0B0E] border border-white/10 rounded-xl p-6 space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold text-[#FCFCFA]">
+                  خريطة الفانل البصرية (Visual Funnel Map)
+                </h2>
+                <p className="text-xs text-[#A39E93]">
+                  كل عقدة في الفانل لها وظيفة واحدة، وتجيب على سؤال واحد، وتدفع الزائر لخطوة واحدة.
+                </p>
               </div>
-              {i < funnelStrategy.funnelMapNodes.length - 1 && (
-                <div className="text-center text-[#F5BF1E] font-mono text-xs">↓</div>
+              {onExpandFunnelDetails && (
+                <button
+                  type="button"
+                  disabled={isGenerating}
+                  onClick={onExpandFunnelDetails}
+                  className="px-3 py-1.5 bg-[#141216] hover:bg-[#23170D] border border-[#F5BF1E]/30 rounded-lg text-xs font-semibold text-[#FBD052] flex items-center gap-1.5 transition-colors"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>تحديث خريطة الفانل والـMVF</span>
+                </button>
               )}
             </div>
-          ))}
-        </div>
-      </div>
 
-      {/* Minimum Viable Funnel (MVF) Protection */}
-      <div className="bg-[#0C0B0E] border border-white/10 rounded-xl p-6 space-y-5">
-        <div className="flex items-center gap-2.5">
-          <Layers className="w-5 h-5 text-[#F5BF1E]" />
-          <div>
-            <h2 className="text-lg font-bold text-[#FCFCFA]">
-              أقل فانل قابل للتشغيل — Minimum Viable Funnel
-            </h2>
-            <p className="text-xs text-[#A39E93]">
-              حماية المبتدئ من فخ المبالغة في البناء (Overbuilding) قبل التحقق من التحويل.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-          <div className="bg-[#23170D]/70 border border-[#F5BF1E]/40 rounded-xl p-4 space-y-2.5">
-            <div className="font-bold text-[#F5BF1E] text-sm">
-              1. ابنِ هذا الآن فقط (Minimum Build)
-            </div>
-            <ul className="space-y-2 text-[#FCFCFA]">
-              {funnelStrategy.minimumViableFunnel.minimumBuild.map((item, idx) => (
-                <li key={idx} className="flex items-start gap-2">
-                  <span className="text-[#F5BF1E] font-bold">✓</span>
-                  <span>{item}</span>
-                </li>
+            <div className="space-y-3">
+              {funnelStrategy.funnelMapNodes.map((node, i) => (
+                <div key={node.id} className="space-y-2">
+                  <div className="bg-[#141216] border border-white/10 rounded-xl p-4 grid grid-cols-1 lg:grid-cols-5 gap-4">
+                    <div>
+                      <span className="text-xs font-mono text-[#F5BF1E]">
+                        خطوة <bdi dir="ltr">0{node.order}</bdi> · <bdi dir="ltr">{node.nodeTypeEn}</bdi>
+                      </span>
+                      <h3 className="text-sm font-bold text-[#FCFCFA] mt-0.5">
+                        {node.nodeTitleAr}
+                      </h3>
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-[#A39E93]">الوظيفة (Purpose)</div>
+                      <div className="text-xs text-[#FCFCFA] mt-0.5">{node.purpose}</div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-[#A39E93]">سؤال الزائر هنا</div>
+                      <div className="text-xs text-[#FBD052] mt-0.5">{node.visitorQuestion}</div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-[#A39E93]">الرسالة والـCTA</div>
+                      <div className="text-xs text-[#FCFCFA] mt-0.5">{node.mainMessage}</div>
+                      <div className="text-xs text-emerald-400 font-semibold mt-1">
+                        CTA: {node.cta}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-[#A39E93]">حدث التتبع (Tracking Event)</div>
+                      <div className="text-xs font-mono text-[#F5BF1E] mt-1">
+                        <bdi dir="ltr">{node.trackingEvent}</bdi>
+                      </div>
+                    </div>
+                  </div>
+                  {funnelStrategy.funnelMapNodes && i < funnelStrategy.funnelMapNodes.length - 1 && (
+                    <div className="text-center text-[#F5BF1E] font-mono text-xs">↓</div>
+                  )}
+                </div>
               ))}
-            </ul>
+            </div>
           </div>
 
-          <div className="bg-[#141216] border border-white/10 rounded-xl p-4 space-y-2.5">
-            <div className="font-bold text-[#FBD052] text-sm">
-              2. اختياري بعد أول نتائج (Optional Later)
-            </div>
-            <ul className="space-y-2 text-[#D6D3CD]">
-              {funnelStrategy.minimumViableFunnel.optionalLater.map((item, idx) => (
-                <li key={idx} className="flex items-start gap-2">
-                  <span className="text-[#A39E93]">•</span>
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {/* Minimum Viable Funnel (MVF) Protection */}
+          {funnelStrategy.minimumViableFunnel && (
+            <div className="bg-[#0C0B0E] border border-white/10 rounded-xl p-6 space-y-5">
+              <div className="flex items-center gap-2.5">
+                <Layers className="w-5 h-5 text-[#F5BF1E]" />
+                <div>
+                  <h2 className="text-lg font-bold text-[#FCFCFA]">
+                    أقل فانل قابل للتشغيل — Minimum Viable Funnel
+                  </h2>
+                  <p className="text-xs text-[#A39E93]">
+                    حماية المبتدئ من فخ المبالغة في البناء (Overbuilding) قبل التحقق من التحويل.
+                  </p>
+                </div>
+              </div>
 
-          <div className="bg-[#141216] border border-white/10 rounded-xl p-4 space-y-2.5">
-            <div className="font-bold text-[#A39E93] text-sm">
-              3. نسخة التوسع مستقبلاً (Scale Version)
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                <div className="bg-[#23170D]/70 border border-[#F5BF1E]/40 rounded-xl p-4 space-y-2.5">
+                  <div className="font-bold text-[#F5BF1E] text-sm">
+                    1. ابنِ هذا الآن فقط (Minimum Build)
+                  </div>
+                  <ul className="space-y-2 text-[#FCFCFA]">
+                    {funnelStrategy.minimumViableFunnel.minimumBuild.map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="text-[#F5BF1E] font-bold">✓</span>
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="bg-[#141216] border border-white/10 rounded-xl p-4 space-y-2.5">
+                  <div className="font-bold text-[#FBD052] text-sm">
+                    2. اختياري بعد أول نتائج (Optional Later)
+                  </div>
+                  <ul className="space-y-2 text-[#D6D3CD]">
+                    {funnelStrategy.minimumViableFunnel.optionalLater.map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="text-[#A39E93]">•</span>
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="bg-[#141216] border border-white/10 rounded-xl p-4 space-y-2.5">
+                  <div className="font-bold text-[#A39E93] text-sm">
+                    3. نسخة التوسع مستقبلاً (Scale Version)
+                  </div>
+                  <ul className="space-y-2 text-[#A39E93]">
+                    {funnelStrategy.minimumViableFunnel.scaleVersion.map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span>•</span>
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
             </div>
-            <ul className="space-y-2 text-[#A39E93]">
-              {funnelStrategy.minimumViableFunnel.scaleVersion.map((item, idx) => (
-                <li key={idx} className="flex items-start gap-2">
-                  <span>•</span>
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
+          )}
+        </>
+      )}
 
         {/* Do Not Build Yet */}
         <div className="bg-red-950/25 border border-red-500/30 rounded-xl p-4 space-y-2">
@@ -469,6 +497,5 @@ export const Stage3FunnelStrategy: React.FC<Stage3FunnelStrategyProps> = ({
           </div>
         </div>
       </div>
-    </div>
   );
 };

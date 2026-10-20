@@ -557,13 +557,14 @@ export class AIProviderManager {
         messageAr: 'تم التحقق من الاتصال بنجاح بالمزود والموديل المختار.'
       };
     } else {
+      const fail = result as import('../types/aiConnection.js').AIFailureResponse;
       return {
         success: false,
         provider: finalConfig.provider,
         model: finalConfig.model,
         discoveredModels: discovered,
-        messageAr: result.error?.message || 'تعذر الاتصال بالمزود.',
-        error: result.error
+        messageAr: fail.error?.message || 'تعذر الاتصال بالمزود.',
+        error: fail.error
       };
     }
   }
