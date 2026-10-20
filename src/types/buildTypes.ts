@@ -395,6 +395,8 @@ export interface ReviewComparisonArchitecture {
 export interface PagesData {
   pagePurposeMap: PagePurposeItem[];
   headlineOptions: HeadlineOption[];
+  selectedHeadlineId?: string;
+  selectedHeadlineText?: string;
   landingPage?: LandingPageArchitecture;
   thankYouPage?: ThankYouPageArchitecture;
   bridgePage?: BridgePageArchitecture;

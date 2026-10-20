@@ -126,19 +126,24 @@ export function scanCopyForRiskyClaims(
   const personalConfirmed = project.researchInput.personalExperienceConfirmed;
 
   const textsToInspect: { loc: string; text: string }[] = [];
-  if (project.pages) {
+  if (project.pages?.landingPage) {
     textsToInspect.push(
-      { loc: 'صفحة الهبوط — العنوان الرئيسي', text: project.pages.landingPage.headlineAr },
-      { loc: 'صفحة الهبوط — العنوان الفرعي', text: project.pages.landingPage.subheadlineAr },
-      { loc: 'صفحة الهبوط — النص الداعم', text: project.pages.landingPage.supportingCopyAr },
-      { loc: 'صفحة الجسر — تقديم المنتج', text: project.pages.bridgePage.productIntroductionAr }
+      { loc: 'صفحة الهبوط — العنوان الرئيسي', text: project.pages.landingPage.headlineAr || '' },
+      { loc: 'صفحة الهبوط — العنوان الفرعي', text: project.pages.landingPage.subheadlineAr || '' },
+      { loc: 'صفحة الهبوط — النص الداعم', text: project.pages.landingPage.supportingCopyAr || '' }
     );
   }
-  if (project.emailSystem) {
-    project.emailSystem.emailsCopy.forEach((em) => {
+  if (project.pages?.bridgePage) {
+    textsToInspect.push({
+      loc: 'صفحة الجسر — تقديم المنتج',
+      text: project.pages.bridgePage.productIntroductionAr || ''
+    });
+  }
+  if (project.emailSystem?.emailsCopy) {
+    (project.emailSystem.emailsCopy || []).forEach((em) => {
       textsToInspect.push({
-        loc: `الإيميل ${em.emailNumber} (${em.subjectLineAr})`,
-        text: `${em.subjectLineAr} ${em.bodyAr}`
+        loc: `الإيميل ${em.emailNumber} (${em.subjectLineAr || ''})`,
+        text: `${em.subjectLineAr || ''} ${em.bodyAr || ''}`
       });
     });
   }
@@ -337,8 +342,9 @@ export function calculateBuildIntegrityAndStatus(
     : 25;
 
   // 7. Email Continuity
+  const generatedEmailCount = project.emailSystem?.emailsCopy?.length || 0;
   const emailContinuity = project.emailSystem
-    ? Math.min(96, 70 + Math.min(5, project.emailSystem.emailsCopy.length) * 5)
+    ? Math.min(96, 70 + Math.min(5, generatedEmailCount) * 5)
     : 25;
 
   // 8. Automation Logic
@@ -441,9 +447,20 @@ export function generateStandalonePageHtml(
 ): string {
   const lp = project.pages?.landingPage;
   const bp = project.pages?.bridgePage;
-  const offerUrl = project.researchInput.offerUrl || '#offer-link';
-
-  if (pageType === 'LANDING' && lp) {
+  if (pageType === 'LANDING') {
+    if (!lp) {
+      return `<!doctype html>
+<html lang="ar" dir="rtl" style="background-color:#040405;">
+<head>
+  <meta charset="UTF-8" />
+  <title>صفحة الهبوط — أنشئ نص الصفحة أولًا</title>
+</head>
+<body style="background-color:#040405; color:#FCFCFA; font-family:sans-serif; padding:40px; text-align:center;">
+  <h2 style="color:#F5BF1E;">أنشئ نص الصفحة أولًا</h2>
+  <p style="color:#A39E93;">لم يتم توليد نص صفحة الهبوط بعد. اضغط على زر توليد نص صفحة الهبوط أولًا لتتمكن من تصدير الكود.</p>
+</body>
+</html>`;
+    }
     const bulletsHtml = lp.whatYouGetBullets
       .map(
         (b) =>
@@ -592,7 +609,21 @@ export function generateStandalonePageHtml(
   }
 
   // Bridge Page HTML
-  const prosHtml = (bp?.pros || [])
+  if (!bp) {
+    return `<!doctype html>
+<html lang="ar" dir="rtl" style="background-color:#040405;">
+<head>
+  <meta charset="UTF-8" />
+  <title>صفحة الجسر — أنشئ نص الصفحة أولًا</title>
+</head>
+<body style="background-color:#040405; color:#FCFCFA; font-family:sans-serif; padding:40px; text-align:center;">
+  <h2 style="color:#F5BF1E;">أنشئ نص الصفحة أولًا</h2>
+  <p style="color:#A39E93;">لم يتم توليد نص صفحة الجسر بعد. اضغط على زر توليد نص صفحة الجسر أولًا لتتمكن من تصدير الكود.</p>
+</body>
+</html>`;
+  }
+  const offerUrl = project.researchInput.offerUrl || '#offer-link';
+  const prosHtml = (bp.pros || [])
     .map((p) => `<li style="margin-bottom:8px;">✓ ${wrapLtrSegments(p)}</li>`)
     .join('\n');
   const consHtml = (bp?.potentialLimitations || [])

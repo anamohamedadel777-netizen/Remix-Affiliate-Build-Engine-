@@ -217,6 +217,18 @@ app.post('/api/build/journey', async (req, res) => {
   const config = extractConnectionConfig(req);
   const { researchInput, lockedElements, mode = 'journey_strategy', selectedStepOrder } = req.body;
 
+  const allowedModes = ['journey_strategy', 'journey_details'];
+  if (!allowedModes.includes(mode)) {
+    return res.status(400).json({
+      success: false,
+      requestId,
+      error: {
+        code: 'INVALID_MODE',
+        message: `وضع الطلب غير صالح: ${mode}. الأوضاع المسموحة: ${allowedModes.join(', ')}`
+      }
+    });
+  }
+
   if (mode === 'journey_details') {
     const prompt = `أنت تصمم تفاصيل إضافية وتشخيصاً معمقاً لمرحلة محددة في رحلة العميل (Customer Journey Deep Diagnostics):
 المرحلة المستهدفة: ${selectedStepOrder || 1}
@@ -381,6 +393,18 @@ app.post('/api/build/funnel', async (req, res) => {
   const requestId = generateRequestId('req_funnel');
   const config = extractConnectionConfig(req);
   const { researchInput, customerJourney, mode = 'funnel_options', selectedFunnelId } = req.body;
+
+  const allowedModes = ['funnel_options', 'funnel_details'];
+  if (!allowedModes.includes(mode)) {
+    return res.status(400).json({
+      success: false,
+      requestId,
+      error: {
+        code: 'INVALID_MODE',
+        message: `وضع الطلب غير صالح: ${mode}. الأوضاع المسموحة: ${allowedModes.join(', ')}`
+      }
+    });
+  }
 
   if (mode === 'funnel_details') {
     const prompt = `أنت مهندس الفانل المعماري (Funnel Architect). قم ببناء خريطة تدفق الفانل البصرية الكاملة والنسخة المصغرة القابلة للتشغيل (Minimum Viable Funnel) للنموذج المختار فقط:
@@ -559,6 +583,18 @@ app.post('/api/build/lead-magnet', async (req, res) => {
     selectedConceptId,
     selectedConcept
   } = req.body;
+
+  const allowedModes = ['lead_magnet_options', 'lead_magnet_details'];
+  if (!allowedModes.includes(mode)) {
+    return res.status(400).json({
+      success: false,
+      requestId,
+      error: {
+        code: 'INVALID_MODE',
+        message: `وضع الطلب غير صالح: ${mode}. الأوضاع المسموحة: ${allowedModes.join(', ')}`
+      }
+    });
+  }
 
   if (mode === 'lead_magnet_details') {
     const prompt = `أنت مهندس الـLead Magnet المعماري (Lead Magnet Architect). قم ببناء الهيكل التفصيلي القابل للتنفيذ (Content Architecture)، وصياغة الوعد النهائي (Promise Statement)، والجسر الاستراتيجي المحكم نحو العرض (Strategic Offer Bridge) للمفهوم المختار:
@@ -745,6 +781,18 @@ app.post('/api/build/pages', async (req, res) => {
     selectedHeadlineId,
     headlineText
   } = req.body;
+
+  const allowedModes = ['pages_strategy', 'page_copy', 'page_details'];
+  if (!allowedModes.includes(mode)) {
+    return res.status(400).json({
+      success: false,
+      requestId,
+      error: {
+        code: 'INVALID_MODE',
+        message: `وضع الطلب غير صالح: ${mode}. الأوضاع المسموحة: ${allowedModes.join(', ')}`
+      }
+    });
+  }
 
   // Phase B: page_copy / page_details — GENERATES ONLY ONE PAGE PER REQUEST!
   if (mode === 'page_details' || mode === 'page_copy') {
@@ -1061,6 +1109,18 @@ app.post('/api/build/email', async (req, res) => {
     mode = 'email_strategy'
   } = req.body;
 
+  const allowedModes = ['email_strategy', 'email_copy'];
+  if (!allowedModes.includes(mode)) {
+    return res.status(400).json({
+      success: false,
+      requestId,
+      error: {
+        code: 'INVALID_MODE',
+        message: `وضع الطلب غير صالح: ${mode}. الأوضاع المسموحة: ${allowedModes.join(', ')}`
+      }
+    });
+  }
+
   // Phase B: email_copy — GENERATES ONLY ONE EMAIL PER REQUEST!
   if (mode === 'email_copy') {
     const prompt = `أنت كاتب إيميلات احترافي (Direct-Response Email Copywriter).
@@ -1231,6 +1291,18 @@ app.post('/api/build/automation', async (req, res) => {
     selectedPlatform = 'Platform-Agnostic',
     mode = 'automation_strategy'
   } = req.body;
+
+  const allowedModes = ['automation_strategy', 'automation_details'];
+  if (!allowedModes.includes(mode)) {
+    return res.status(400).json({
+      success: false,
+      requestId,
+      error: {
+        code: 'INVALID_MODE',
+        message: `وضع الطلب غير صالح: ${mode}. الأوضاع المسموحة: ${allowedModes.join(', ')}`
+      }
+    });
+  }
 
   // Phase B: automation_details — Generates detailed workflow nodes and platform notes on demand
   if (mode === 'automation_details') {

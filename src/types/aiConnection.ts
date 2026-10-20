@@ -25,7 +25,8 @@ export type NormalizedErrorCode =
   | 'INVALID_RESPONSE'
   | 'STRUCTURED_OUTPUT_FAILED'
   | 'PROVIDER_ERROR'
-  | 'INVALID_INPUT';
+  | 'INVALID_INPUT'
+  | 'INVALID_MODE';
 
 export interface AISuccessResponse<T = any> {
   success: true;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   AffiliateBuildProject,
   BuildStageId,
@@ -80,6 +80,11 @@ export default function App() {
     }
     return createEmptyBuildProject();
   });
+
+  const projectRef = useRef(project);
+  useEffect(() => {
+    projectRef.current = project;
+  }, [project]);
 
   // Problem 1 Fix: Universal Multi-Provider BYOK (session-only storage)
   const [aiConnection, setAiConnection] = useState<AIConnectionConfig | null>(() =>
@@ -325,7 +330,7 @@ export default function App() {
     endpoint: string,
     body: any,
     onSuccess: (data: T) => void
-  ) {
+  ): Promise<boolean> {
     setIsGenerating(true);
     setLoadingMessageAr(loadingMsg);
     setErrorState(null);
@@ -353,9 +358,9 @@ export default function App() {
           messageAr: 'فشل تحليل الاستجابة من الخادم.',
           code: 'INVALID_RESPONSE',
           requestId: `req_err_${Date.now()}`,
-          retryFn: async () => runAiOperation(loadingMsg, endpoint, body, onSuccess)
+          retryFn: async () => { await runAiOperation(loadingMsg, endpoint, body, onSuccess); }
         });
-        return;
+        return false;
       }
 
       // 1. Check HTTP and normalized server failure
@@ -369,9 +374,9 @@ export default function App() {
           messageAr: serverMessage,
           code: serverCode,
           requestId: json?.requestId || 'unknown',
-          retryFn: async () => runAiOperation(loadingMsg, endpoint, body, onSuccess)
+          retryFn: async () => { await runAiOperation(loadingMsg, endpoint, body, onSuccess); }
         });
-        return;
+        return false;
       }
 
       // 2. Structured Output Verification after success === true
@@ -380,19 +385,21 @@ export default function App() {
           messageAr: 'لم يتم استلام محتوى صالح من المزود.',
           code: 'STRUCTURED_OUTPUT_FAILED',
           requestId: json.requestId || 'unknown',
-          retryFn: async () => runAiOperation(loadingMsg, endpoint, body, onSuccess)
+          retryFn: async () => { await runAiOperation(loadingMsg, endpoint, body, onSuccess); }
         });
-        return;
+        return false;
       }
 
       onSuccess(json.data);
+      return true;
     } catch (err: any) {
       setErrorState({
         messageAr: 'تعذر الاتصال بالخادم. تحقق من اتصال الإنترنت أو حالة السيرفر.',
         code: 'CONNECTION_FAILED',
         requestId: `req_conn_${Date.now()}`,
-        retryFn: async () => runAiOperation(loadingMsg, endpoint, body, onSuccess)
+        retryFn: async () => { await runAiOperation(loadingMsg, endpoint, body, onSuccess); }
       });
+      return false;
     } finally {
       setIsGenerating(false);
       setLoadingMessageAr('');
@@ -614,24 +621,23 @@ export default function App() {
       },
       (data) => {
         setProject((prev) => {
+          const headlineOptions = data?.headlineOptions || [];
+          const chosenHeadline =
+            headlineOptions.find((h) => h.isRecommended) || headlineOptions[0];
+
           const updated = {
             ...prev,
             pages: {
-              ...data,
-              landingPage: {
-                ...data.landingPage,
-                headlineAr:
-                  prev.lockedElements.headline && prev.pages
-                    ? prev.pages.landingPage.headlineAr
-                    : data.landingPage.headlineAr,
-                ctaButtonTextAr:
-                  prev.lockedElements.mainCta && prev.pages
-                    ? prev.pages.landingPage.ctaButtonTextAr
-                    : data.landingPage.ctaButtonTextAr,
-                status: 'REVIEW' as CopyStatus
-              },
-              thankYouPage: { ...data.thankYouPage, status: 'REVIEW' as CopyStatus },
-              bridgePage: { ...data.bridgePage, status: 'REVIEW' as CopyStatus },
+              pagePurposeMap: data?.pagePurposeMap || [],
+              headlineOptions,
+              selectedHeadlineId:
+                prev.lockedElements.headline && prev.pages?.selectedHeadlineId
+                  ? prev.pages.selectedHeadlineId
+                  : chosenHeadline?.id || '',
+              selectedHeadlineText:
+                prev.lockedElements.headline && prev.pages?.selectedHeadlineText
+                  ? prev.pages.selectedHeadlineText
+                  : chosenHeadline?.headlineAr || '',
               claimsAudit: []
             }
           };
@@ -658,8 +664,12 @@ export default function App() {
       {
         mode: 'page_copy',
         pageId,
-        selectedHeadlineId: project.pages.landingPage?.selectedHeadlineId,
-        headlineText: project.pages.landingPage?.headlineAr,
+        selectedHeadlineId:
+          project.pages.selectedHeadlineId ||
+          project.pages.landingPage?.selectedHeadlineId,
+        headlineText:
+          project.pages.selectedHeadlineText ||
+          project.pages.landingPage?.headlineAr,
         researchInput: project.researchInput,
         leadMagnet: project.leadMagnet,
         proofLibrary: project.proofLibrary
@@ -678,10 +688,15 @@ export default function App() {
           if (!prev.pages) return prev;
           const updatedPages = { ...prev.pages };
           if (targetId === 'landing') {
+            const chosenHlText =
+              prev.lockedElements.headline && prev.pages.selectedHeadlineText
+                ? prev.pages.selectedHeadlineText
+                : pageContent.headlineAr || prev.pages.selectedHeadlineText || '';
+
             updatedPages.landingPage = {
               ...(prev.pages.landingPage || {
-                selectedHeadlineId: '',
-                headlineAr: '',
+                selectedHeadlineId: prev.pages.selectedHeadlineId || '',
+                headlineAr: chosenHlText,
                 subheadlineAr: '',
                 supportingCopyAr: '',
                 whatYouGetBullets: [],
@@ -696,10 +711,9 @@ export default function App() {
                 mobileNotesAr: []
               }),
               ...pageContent,
-              headlineAr:
-                prev.lockedElements.headline && prev.pages.landingPage
-                  ? prev.pages.landingPage.headlineAr
-                  : pageContent.headlineAr || prev.pages.landingPage?.headlineAr || '',
+              selectedHeadlineId:
+                prev.pages.selectedHeadlineId || prev.pages.landingPage?.selectedHeadlineId || '',
+              headlineAr: chosenHlText,
               ctaButtonTextAr:
                 prev.lockedElements.mainCta && prev.pages.landingPage
                   ? prev.pages.landingPage.ctaButtonTextAr
@@ -789,53 +803,34 @@ export default function App() {
     );
   };
 
-  // Phase B: On-demand All Emails Copy (Full rich direct-response copy)
-  const handleGenerateAllEmailsCopy = async () => {
-    if (project.lockedElements.emailSequence || !project.emailSystem) return;
-    await runAiOperation<any>(
-      'بنصيغ نصوص جميع الإيميلات الكاملة مع خيارات العناوين...',
-      '/api/build/email',
-      {
-        mode: 'email_details',
-        researchInput: project.researchInput,
-        leadMagnet: project.leadMagnet,
-        pages: project.pages,
-        emailSystem: project.emailSystem
-      },
-      (detailsData) => {
-        if (detailsData.emailsCopy && Array.isArray(detailsData.emailsCopy)) {
-          setProject((prev) => {
-            if (!prev.emailSystem) return prev;
-            return {
-              ...prev,
-              emailSystem: {
-                ...prev.emailSystem,
-                emailsCopy: detailsData.emailsCopy
-              }
-            };
-          });
-        }
-      }
-    );
-  };
-
   // Phase B: Single Email Copy on-demand (email_copy)
-  const handleGenerateSingleEmail = async (emailNumber = 1) => {
-    if (project.lockedElements.emailSequence || !project.emailSystem) return;
+  const handleGenerateSingleEmail = async (emailNumber = 1): Promise<boolean> => {
+    if (projectRef.current.lockedElements.emailSequence || !projectRef.current.emailSystem) {
+      return false;
+    }
+    const currentEmailSystem = projectRef.current.emailSystem;
     const blueprintItem =
-      project.emailSystem.blueprint.find((b) => b.emailNumber === emailNumber) || {
-        emailNumber
+      currentEmailSystem.blueprint.find((b) => b.emailNumber === emailNumber) || {
+        emailNumber,
+        sequenceTypeEn: 'NURTURE',
+        purposeAr: '',
+        subjectAngleAr: '',
+        coreMessageAr: '',
+        objectionHandledAr: '',
+        ctaAr: '',
+        behaviorTriggerAr: ''
       };
-    await runAiOperation<any>(
+
+    return await runAiOperation<any>(
       `بنكتب نص الإيميل رقم 0${emailNumber}...`,
       '/api/build/email',
       {
         mode: 'email_copy',
         emailNumber,
         blueprintItem,
-        strategySummary: project.emailSystem.strategy?.desiredBehavior,
-        researchInput: project.researchInput,
-        leadMagnet: project.leadMagnet
+        strategySummary: currentEmailSystem.strategy?.desiredBehavior,
+        researchInput: projectRef.current.researchInput,
+        leadMagnet: projectRef.current.leadMagnet
       },
       (data) => {
         const emailResult: GeneratedEmailCopy = data?.email || data;
@@ -858,6 +853,34 @@ export default function App() {
     );
   };
 
+  // Phase B: Sequential Bulk Email Generation (Sequential individual email_copy calls)
+  const handleGenerateAllEmailsCopy = async () => {
+    if (
+      projectRef.current.lockedElements.emailSequence ||
+      !projectRef.current.emailSystem ||
+      !projectRef.current.emailSystem.blueprintApprovedByStudent
+    ) {
+      return;
+    }
+
+    const blueprint = projectRef.current.emailSystem.blueprint || [];
+    for (const blueprintItem of blueprint) {
+      const existingEmails = projectRef.current.emailSystem?.emailsCopy || [];
+      const alreadyExists = existingEmails.some(
+        (email) => email.emailNumber === blueprintItem.emailNumber
+      );
+      if (alreadyExists) {
+        continue;
+      }
+
+      const success = await handleGenerateSingleEmail(blueprintItem.emailNumber);
+      if (!success) {
+        // Stop on failure immediately without deleting previously generated emails
+        break;
+      }
+    }
+  };
+
   const handleConfirmEmailBlueprint = () => {
     setProject((prev) => {
       if (!prev.emailSystem) return prev;
@@ -872,7 +895,11 @@ export default function App() {
   };
 
   const handleRewriteSingleEmail = async (emailNumber: number) => {
-    if (project.lockedElements.emailSequence) return;
+    if (project.lockedElements.emailSequence || !project.emailSystem) return;
+    const currentEmails = project.emailSystem.emailsCopy || [];
+    const targetEmail = currentEmails.find((em) => em.emailNumber === emailNumber);
+    if (!targetEmail) return;
+
     await runAiOperation<any>(
       `بنعيد صياغة الإيميل رقم ${emailNumber} مع الحفاظ على باقي السلسلة...`,
       '/api/build/regenerate-item',
@@ -884,11 +911,14 @@ export default function App() {
       (updatedEmail) => {
         setProject((prev) => {
           if (!prev.emailSystem) return prev;
+          const list = prev.emailSystem.emailsCopy || [];
+          const exists = list.some((em) => em.emailNumber === emailNumber);
+          if (!exists) return prev;
           return {
             ...prev,
             emailSystem: {
               ...prev.emailSystem,
-              emailsCopy: prev.emailSystem.emailsCopy.map((em) =>
+              emailsCopy: list.map((em) =>
                 em.emailNumber === emailNumber
                   ? {
                       ...em,
@@ -1167,11 +1197,12 @@ export default function App() {
                 if (project.lockedElements.funnel) return;
                 setProject((prev) => {
                   if (!prev.funnelStrategy) return prev;
-                  // Problem 5 & 3: Unconfirm primary funnel on selection and invalidate downstream
                   const updatedFunnel = {
                     ...prev.funnelStrategy,
                     primaryFunnelId: modelId,
-                    confirmedByStudent: false
+                    confirmedByStudent: false,
+                    funnelMapNodes: undefined,
+                    minimumViableFunnel: undefined
                   };
                   return invalidateDownstream(
                     { ...prev, funnelStrategy: updatedFunnel },
@@ -1208,19 +1239,16 @@ export default function App() {
                 if (project.lockedElements.leadMagnet) return;
                 setProject((prev) => {
                   if (!prev.leadMagnet) return prev;
-                  const chosen = prev.leadMagnet.concepts.find(
-                    (c) => c.id === conceptId
-                  );
                   const updatedLeadMagnet = {
                     ...prev.leadMagnet,
                     selectedConceptId: conceptId,
-                    promiseStatement:
-                      chosen && !prev.lockedElements.promise
-                        ? {
-                            ...prev.leadMagnet.promiseStatement,
-                            fullPromiseAr: chosen.promiseAr
-                          }
-                        : prev.leadMagnet.promiseStatement
+                    promiseStatement: prev.lockedElements.promise
+                      ? (prev.leadMagnet.promiseStatement
+                          ? { ...prev.leadMagnet.promiseStatement, status: 'NEEDS_REVIEW' as CopyStatus }
+                          : undefined)
+                      : undefined,
+                    contentArchitecture: undefined,
+                    offerBridge: undefined
                   };
                   return invalidateDownstream(
                     { ...prev, leadMagnet: updatedLeadMagnet },
@@ -1230,7 +1258,7 @@ export default function App() {
               }}
               onUpdatePromise={(newPromiseText, status) => {
                 setProject((prev) =>
-                  prev.leadMagnet
+                  prev.leadMagnet && prev.leadMagnet.promiseStatement
                     ? {
                         ...prev,
                         leadMagnet: {
@@ -1270,47 +1298,51 @@ export default function App() {
                         ...prev,
                         pages: {
                           ...prev.pages,
-                          landingPage: {
-                            ...prev.pages.landingPage,
-                            selectedHeadlineId: headlineId,
-                            headlineAr: headlineText
-                          }
+                          selectedHeadlineId: headlineId,
+                          selectedHeadlineText: headlineText,
+                          ...(prev.pages.landingPage
+                            ? {
+                                landingPage: {
+                                  ...prev.pages.landingPage,
+                                  selectedHeadlineId: headlineId,
+                                  headlineAr: headlineText
+                                }
+                              }
+                            : {})
                         }
                       }
                     : prev
                 );
               }}
               onUpdateLandingCopy={(patch) => {
-                setProject((prev) =>
-                  prev.pages
-                    ? {
-                        ...prev,
-                        pages: {
-                          ...prev.pages,
-                          landingPage: {
-                            ...prev.pages.landingPage,
-                            ...patch
-                          }
-                        }
+                setProject((prev) => {
+                  if (!prev.pages?.landingPage) return prev;
+                  return {
+                    ...prev,
+                    pages: {
+                      ...prev.pages,
+                      landingPage: {
+                        ...prev.pages.landingPage,
+                        ...patch
                       }
-                    : prev
-                );
+                    }
+                  };
+                });
               }}
               onUpdateBridgeCopy={(patch) => {
-                setProject((prev) =>
-                  prev.pages
-                    ? {
-                        ...prev,
-                        pages: {
-                          ...prev.pages,
-                          bridgePage: {
-                            ...prev.pages.bridgePage,
-                            ...patch
-                          }
-                        }
+                setProject((prev) => {
+                  if (!prev.pages?.bridgePage) return prev;
+                  return {
+                    ...prev,
+                    pages: {
+                      ...prev.pages,
+                      bridgePage: {
+                        ...prev.pages.bridgePage,
+                        ...patch
                       }
-                    : prev
-                );
+                    }
+                  };
+                });
               }}
               isHeadlineLocked={project.lockedElements.headline}
               onToggleHeadlineLock={() => handleToggleLock('headline')}
@@ -1326,7 +1358,9 @@ export default function App() {
               emailSystem={project.emailSystem}
               onGenerateEmailSystem={handleGenerateEmailSystem}
               onGenerateAllEmailsCopy={handleGenerateAllEmailsCopy}
-              onGenerateSingleEmail={handleGenerateSingleEmail}
+              onGenerateSingleEmail={async (num) => {
+                await handleGenerateSingleEmail(num);
+              }}
               onConfirmBlueprint={handleConfirmEmailBlueprint}
               onRewriteSingleEmail={handleRewriteSingleEmail}
               onUpdateEmailCopy={(

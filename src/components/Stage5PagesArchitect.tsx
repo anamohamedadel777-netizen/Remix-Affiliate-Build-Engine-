@@ -269,7 +269,10 @@ export const Stage5PagesArchitect: React.FC<Stage5PagesArchitectProps> = ({
 
           <div className="space-y-3">
             {pages.headlineOptions.map((hl) => {
-              const isSelected = pages.landingPage.headlineAr === hl.headlineAr;
+              const isSelected =
+                pages.selectedHeadlineId === hl.id ||
+                (!pages.selectedHeadlineId && pages.selectedHeadlineText === hl.headlineAr) ||
+                (!pages.selectedHeadlineId && !pages.selectedHeadlineText && pages.landingPage?.headlineAr === hl.headlineAr);
               return (
                 <div
                   key={hl.id}
@@ -722,67 +725,105 @@ export const Stage5PagesArchitect: React.FC<Stage5PagesArchitectProps> = ({
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center bg-[#141216] p-1 rounded-lg border border-white/10">
-                <button
-                  type="button"
-                  onClick={() => setExportHtmlType('LANDING')}
-                  className={`px-3 py-1 rounded text-xs font-bold ${
-                    exportHtmlType === 'LANDING'
-                      ? 'bg-[#F5BF1E] text-[#040405]'
-                      : 'text-[#A39E93]'
-                  }`}
-                >
-                  صفحة الهبوط
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setExportHtmlType('BRIDGE')}
-                  className={`px-3 py-1 rounded text-xs font-bold ${
-                    exportHtmlType === 'BRIDGE'
-                      ? 'bg-[#F5BF1E] text-[#040405]'
-                      : 'text-[#A39E93]'
-                  }`}
-                >
-                  صفحة الجسر
-                </button>
-              </div>
+            {(() => {
+              const isSelectedPageAvailable =
+                exportHtmlType === 'LANDING'
+                  ? Boolean(pages.landingPage)
+                  : Boolean(pages.bridgePage);
 
-              <button
-                type="button"
-                onClick={handleCopyHtml}
-                className="px-3.5 py-2 bg-[#141216] hover:bg-[#23170D] border border-white/15 rounded-lg text-xs text-[#FCFCFA] flex items-center gap-1.5"
-              >
-                {copiedHtml ? (
-                  <>
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>تم نسخ الكود</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3.5 h-3.5 text-[#F5BF1E]" />
-                    <span>نسخ كود HTML</span>
-                  </>
-                )}
-              </button>
+              return (
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center bg-[#141216] p-1 rounded-lg border border-white/10">
+                    <button
+                      type="button"
+                      onClick={() => setExportHtmlType('LANDING')}
+                      className={`px-3 py-1 rounded text-xs font-bold ${
+                        exportHtmlType === 'LANDING'
+                          ? 'bg-[#F5BF1E] text-[#040405]'
+                          : 'text-[#A39E93]'
+                      }`}
+                    >
+                      صفحة الهبوط
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setExportHtmlType('BRIDGE')}
+                      className={`px-3 py-1 rounded text-xs font-bold ${
+                        exportHtmlType === 'BRIDGE'
+                          ? 'bg-[#F5BF1E] text-[#040405]'
+                          : 'text-[#A39E93]'
+                      }`}
+                    >
+                      صفحة الجسر
+                    </button>
+                  </div>
 
-              <button
-                type="button"
-                onClick={handleDownloadHtml}
-                className="px-4 py-2 bg-[#F5BF1E] hover:bg-[#FBD052] text-[#040405] font-bold rounded-lg text-xs flex items-center gap-1.5"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>تحميل ملف .html</span>
-              </button>
-            </div>
+                  <button
+                    type="button"
+                    disabled={!isSelectedPageAvailable}
+                    onClick={handleCopyHtml}
+                    title={!isSelectedPageAvailable ? 'أنشئ نص الصفحة أولًا' : ''}
+                    className="px-3.5 py-2 bg-[#141216] hover:bg-[#23170D] disabled:opacity-40 disabled:cursor-not-allowed border border-white/15 rounded-lg text-xs text-[#FCFCFA] flex items-center gap-1.5"
+                  >
+                    {copiedHtml ? (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>تم نسخ الكود</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5 text-[#F5BF1E]" />
+                        <span>نسخ كود HTML</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={!isSelectedPageAvailable}
+                    onClick={handleDownloadHtml}
+                    title={!isSelectedPageAvailable ? 'أنشئ نص الصفحة أولًا' : ''}
+                    className="px-4 py-2 bg-[#F5BF1E] hover:bg-[#FBD052] disabled:opacity-40 disabled:cursor-not-allowed text-[#040405] font-bold rounded-lg text-xs flex items-center gap-1.5"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>تحميل ملف .html</span>
+                  </button>
+                </div>
+              );
+            })()}
           </div>
 
-          <pre
-            dir="ltr"
-            className="bg-[#040405] border border-white/10 rounded-xl p-4 text-xs font-mono text-[#D6D3CD] overflow-x-auto max-h-[380px]"
-          >
-            {generatedHtmlCode}
-          </pre>
+          {(() => {
+            const isSelectedPageAvailable =
+              exportHtmlType === 'LANDING'
+                ? Boolean(pages.landingPage)
+                : Boolean(pages.bridgePage);
+
+            if (!isSelectedPageAvailable) {
+              return (
+                <div className="bg-[#141216] border border-amber-500/30 rounded-xl p-8 text-center space-y-3">
+                  <Code2 className="w-8 h-8 text-amber-400 mx-auto" />
+                  <h3 className="text-base font-bold text-amber-300">
+                    أنشئ نص الصفحة أولًا
+                  </h3>
+                  <p className="text-xs text-[#A39E93] max-w-md mx-auto">
+                    {exportHtmlType === 'LANDING'
+                      ? 'لم يتم إنشاء نص صفحة الهبوط بعد. انتقل إلى تبويب "صفحة الهبوط" واضغط على زر توليد نص الصفحة أولًا لتتمكن من تصدير كود HTML.'
+                      : 'لم يتم إنشاء نص صفحة الجسر بعد. انتقل إلى تبويب "صفحة الجسر" واضغط على زر توليد نص الصفحة أولًا لتتمكن من تصدير كود HTML.'}
+                  </p>
+                </div>
+              );
+            }
+
+            return (
+              <pre
+                dir="ltr"
+                className="bg-[#040405] border border-white/10 rounded-xl p-4 text-xs font-mono text-[#D6D3CD] overflow-x-auto max-h-[380px]"
+              >
+                {generatedHtmlCode}
+              </pre>
+            );
+          })()}
         </div>
       )}
 
