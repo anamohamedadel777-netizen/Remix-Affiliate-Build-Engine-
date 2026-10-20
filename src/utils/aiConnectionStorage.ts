@@ -6,7 +6,7 @@ export const DEFAULT_MODELS_BY_PROVIDER: Record<AIProviderType, string> = {
   gemini: 'gemini-2.5-flash',
   openai: 'gpt-4o',
   anthropic: 'claude-3-5-sonnet-20241022',
-  'openai-compatible': 'gpt-4o'
+  'openai-compatible': ''
 };
 
 export const PROVIDER_LABELS_AR: Record<AIProviderType, string> = {
@@ -25,7 +25,7 @@ export function getStoredAIConnection(): AIConnectionConfig | null {
       return {
         provider: parsed.provider,
         apiKey: parsed.apiKey.trim(),
-        model: parsed.model || DEFAULT_MODELS_BY_PROVIDER[parsed.provider as AIProviderType] || 'gemini-2.5-flash',
+        model: parsed.model ? parsed.model.trim() : (parsed.provider === 'openai-compatible' ? '' : DEFAULT_MODELS_BY_PROVIDER[parsed.provider as AIProviderType] || 'gemini-2.5-flash'),
         baseUrl: parsed.baseUrl?.trim() || null,
         providerName: parsed.providerName?.trim() || null
       };

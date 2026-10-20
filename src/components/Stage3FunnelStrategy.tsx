@@ -15,6 +15,7 @@ import {
 interface Stage3FunnelStrategyProps {
   funnelStrategy: FunnelStrategyData | null;
   onGenerateFunnel: () => Promise<void>;
+  onExpandFunnelDetails?: () => Promise<void>;
   onSelectPrimaryFunnel: (modelId: string) => void;
   onConfirmFunnel: () => void;
   isFunnelLocked: boolean;
@@ -26,6 +27,7 @@ interface Stage3FunnelStrategyProps {
 export const Stage3FunnelStrategy: React.FC<Stage3FunnelStrategyProps> = ({
   funnelStrategy,
   onGenerateFunnel,
+  onExpandFunnelDetails,
   onSelectPrimaryFunnel,
   onConfirmFunnel,
   isFunnelLocked,
@@ -275,13 +277,26 @@ export const Stage3FunnelStrategy: React.FC<Stage3FunnelStrategyProps> = ({
 
       {/* Visual Funnel Map Nodes */}
       <div className="bg-[#0C0B0E] border border-white/10 rounded-xl p-6 space-y-5">
-        <div>
-          <h2 className="text-lg font-bold text-[#FCFCFA]">
-            خريطة الفانل البصرية (Visual Funnel Map)
-          </h2>
-          <p className="text-xs text-[#A39E93]">
-            كل عقدة في الفانل لها وظيفة واحدة، وتجيب على سؤال واحد، وتدفع الزائر لخطوة واحدة.
-          </p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-[#FCFCFA]">
+              خريطة الفانل البصرية (Visual Funnel Map)
+            </h2>
+            <p className="text-xs text-[#A39E93]">
+              كل عقدة في الفانل لها وظيفة واحدة، وتجيب على سؤال واحد، وتدفع الزائر لخطوة واحدة.
+            </p>
+          </div>
+          {onExpandFunnelDetails && (
+            <button
+              type="button"
+              disabled={isGenerating}
+              onClick={onExpandFunnelDetails}
+              className="px-3 py-1.5 bg-[#141216] hover:bg-[#23170D] border border-[#F5BF1E]/30 rounded-lg text-xs font-semibold text-[#FBD052] flex items-center gap-1.5 transition-colors"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>توليد وتوسيع تفاصيل خريطة الفانل والـMVF</span>
+            </button>
+          )}
         </div>
 
         <div className="space-y-3">

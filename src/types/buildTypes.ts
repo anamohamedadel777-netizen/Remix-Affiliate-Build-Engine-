@@ -636,6 +636,7 @@ export interface LockedElementsMap {
 }
 
 export interface AffiliateBuildProject {
+  schemaVersion?: number;
   id: string;
   updatedAt: string;
   currentStage: BuildStageId;

@@ -71,40 +71,50 @@ export const AIConnectionModal: React.FC<AIConnectionModalProps> = ({
     }
   }, [isOpen]);
 
-  // When provider changes, update default model if model not manually set or belongs to another provider
+  // ISSUE 1 & ISSUE 2 FIX: When provider changes, IMMEDIATELY clear API key and reset fields
   const handleSelectProvider = (newProvider: AIProviderType) => {
+    if (newProvider === provider) return;
+
     setProvider(newProvider);
+    // Never leak credentials across providers!
+    setApiKey('');
     setTestResult(null);
     setAvailableModels([]);
+
     if (newProvider === 'openai-compatible') {
-      if (!model || model.startsWith('gemini') || model.startsWith('claude')) {
-        setModel('gpt-4o');
-      }
-      if (!baseUrl) {
-        setBaseUrl('https://api.openai.com/v1');
-      }
-      if (!providerName) {
-        setProviderName('Custom Provider');
-      }
+      // Do NOT force gpt-4o or OpenAI Base URL
+      setModel('');
+      setBaseUrl('');
+      setProviderName('');
     } else {
       setModel(DEFAULT_MODELS_BY_PROVIDER[newProvider]);
+      setBaseUrl('');
+      setProviderName('');
     }
   };
 
   const currentConfig: AIConnectionConfig = {
     provider,
     apiKey: apiKey.trim(),
-    model: model.trim() || DEFAULT_MODELS_BY_PROVIDER[provider],
+    model: model.trim() || (provider === 'openai-compatible' ? '' : DEFAULT_MODELS_BY_PROVIDER[provider]),
     baseUrl: baseUrl.trim() || null,
     providerName: providerName.trim() || null
   };
 
-  // 1. Test Connection
+  // 1. Test Connection (Uses single JSON body transport, respects corrected models)
   const handleTestConnection = async () => {
     if (!apiKey.trim()) {
       setTestResult({
         success: false,
         messageAr: 'يرجى إدخال مفتاح API أولاً لاختبار الاتصال.'
+      });
+      return;
+    }
+
+    if (provider === 'openai-compatible' && !model.trim() && availableModels.length === 0) {
+      setTestResult({
+        success: false,
+        messageAr: 'يرجى إدخال اسم الموديل يدويًا أو تحديث قائمة الموديلات.'
       });
       return;
     }
@@ -116,12 +126,7 @@ export const AIConnectionModal: React.FC<AIConnectionModalProps> = ({
       const res = await fetch('/api/ai/test-connection', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'x-ai-provider': currentConfig.provider,
-          'x-ai-api-key': currentConfig.apiKey,
-          'x-ai-model': currentConfig.model,
-          'x-ai-base-url': encodeURIComponent(currentConfig.baseUrl || ''),
-          'x-ai-provider-name': encodeURIComponent(currentConfig.providerName || '')
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ connectionConfig: currentConfig })
       });
@@ -132,12 +137,21 @@ export const AIConnectionModal: React.FC<AIConnectionModalProps> = ({
           success: true,
           messageAr: json.data?.message || 'تم الاتصال بنجاح بالمزود والموديل المختار.'
         });
+        if (json.model && json.model !== model) {
+          setModel(json.model);
+        }
+        if (Array.isArray(json.discoveredModels) && json.discoveredModels.length > 0) {
+          setAvailableModels(json.discoveredModels);
+        }
       } else {
         setTestResult({
           success: false,
           code: json.error?.code,
           messageAr: json.error?.message || 'فشل الاتصال بالمزود.'
         });
+        if (Array.isArray(json.discoveredModels) && json.discoveredModels.length > 0) {
+          setAvailableModels(json.discoveredModels);
+        }
       }
     } catch {
       setTestResult({
@@ -150,7 +164,7 @@ export const AIConnectionModal: React.FC<AIConnectionModalProps> = ({
     }
   };
 
-  // 2. Refresh Models Discovery
+  // 2. Refresh Models Discovery (Live discovery, auto-selects valid model)
   const handleRefreshModels = async () => {
     if (!apiKey.trim()) {
       setTestResult({
@@ -165,12 +179,7 @@ export const AIConnectionModal: React.FC<AIConnectionModalProps> = ({
       const res = await fetch('/api/ai/models', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'x-ai-provider': currentConfig.provider,
-          'x-ai-api-key': currentConfig.apiKey,
-          'x-ai-model': currentConfig.model,
-          'x-ai-base-url': encodeURIComponent(currentConfig.baseUrl || ''),
-          'x-ai-provider-name': encodeURIComponent(currentConfig.providerName || '')
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ connectionConfig: currentConfig })
       });
@@ -178,7 +187,8 @@ export const AIConnectionModal: React.FC<AIConnectionModalProps> = ({
       const json = await res.json();
       if (json.success && Array.isArray(json.data?.models)) {
         setAvailableModels(json.data.models);
-        if (json.data.models.length > 0 && !json.data.models.includes(model)) {
+        // Model Discovery Rule: If live discovery succeeds and current model is not in list, auto-select first
+        if (json.data.models.length > 0 && (!model || !json.data.models.includes(model))) {
           setModel(json.data.models[0]);
         }
       }
@@ -189,7 +199,7 @@ export const AIConnectionModal: React.FC<AIConnectionModalProps> = ({
     }
   };
 
-  // 3. Save Connection (sessionStorage only)
+  // 3. Save Connection (sessionStorage only, requires model for custom)
   const handleSaveConnection = (e: React.FormEvent) => {
     e.preventDefault();
     if (!apiKey.trim()) {
@@ -200,8 +210,33 @@ export const AIConnectionModal: React.FC<AIConnectionModalProps> = ({
       return;
     }
 
-    saveAIConnection(currentConfig);
-    onConnectionUpdated(currentConfig);
+    if (provider === 'openai-compatible' && !model.trim()) {
+      setTestResult({
+        success: false,
+        messageAr: 'يرجى إدخال اسم الموديل يدويًا أو تحديث قائمة الموديلات قبل الحفظ.'
+      });
+      return;
+    }
+
+    const finalModel = model.trim() || DEFAULT_MODELS_BY_PROVIDER[provider];
+    if (!finalModel) {
+      setTestResult({
+        success: false,
+        messageAr: 'اسم الموديل مطلوب.'
+      });
+      return;
+    }
+
+    const configToSave: AIConnectionConfig = {
+      provider,
+      apiKey: apiKey.trim(),
+      model: finalModel,
+      baseUrl: baseUrl.trim() || null,
+      providerName: providerName.trim() || null
+    };
+
+    saveAIConnection(configToSave);
+    onConnectionUpdated(configToSave);
     setSaveSuccess(true);
     setTimeout(() => {
       setSaveSuccess(false);
@@ -213,7 +248,11 @@ export const AIConnectionModal: React.FC<AIConnectionModalProps> = ({
   const handleDisconnect = () => {
     clearStoredAIConnection();
     setApiKey('');
+    setModel(provider === 'openai-compatible' ? '' : DEFAULT_MODELS_BY_PROVIDER[provider]);
+    setBaseUrl('');
+    setProviderName('');
     setTestResult(null);
+    setAvailableModels([]);
     onConnectionUpdated(null);
   };
 
@@ -285,7 +324,7 @@ export const AIConnectionModal: React.FC<AIConnectionModalProps> = ({
             </div>
           </div>
 
-          {/* Custom Provider Specific Fields */}
+          {/* Custom Provider Specific Fields (No forced gpt-4o or OpenAI Base URL) */}
           {provider === 'openai-compatible' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-[#141216] border border-white/10 rounded-xl">
               <div>
@@ -296,7 +335,7 @@ export const AIConnectionModal: React.FC<AIConnectionModalProps> = ({
                   type="text"
                   value={providerName}
                   onChange={(e) => setProviderName(e.target.value)}
-                  placeholder="مثال: OpenRouter / Groq / DeepSeek"
+                  placeholder="APInex"
                   className="w-full bg-[#0C0B0E] border border-white/15 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#F5BF1E]"
                 />
               </div>
@@ -311,7 +350,7 @@ export const AIConnectionModal: React.FC<AIConnectionModalProps> = ({
                     dir="ltr"
                     value={baseUrl}
                     onChange={(e) => setBaseUrl(e.target.value)}
-                    placeholder="https://openrouter.ai/api/v1"
+                    placeholder="https://api.example.com/v1"
                     className="w-full bg-transparent px-2 py-2 text-xs text-white font-mono focus:outline-none"
                   />
                 </div>
@@ -383,7 +422,11 @@ export const AIConnectionModal: React.FC<AIConnectionModalProps> = ({
                 dir="ltr"
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
-                placeholder="أدخل اسم الموديل (مثل: gpt-4o أو claude-3-5-sonnet أو gemini-2.5-flash)"
+                placeholder={
+                  provider === 'openai-compatible'
+                    ? 'يتم اختياره بعد تحديث القائمة أو إدخاله يدويًا'
+                    : 'أدخل اسم الموديل يدويًا أو اضغط تحديث'
+                }
                 className="w-full bg-[#141216] border border-white/15 rounded-xl px-3.5 py-2 text-xs text-white font-mono focus:outline-none focus:border-[#F5BF1E]"
               />
             )}

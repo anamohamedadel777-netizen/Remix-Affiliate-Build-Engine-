@@ -35,9 +35,28 @@ export function createEmptyResearchInput(): ResearchInput {
   };
 }
 
+export function isLegacyDemoProject(parsed: any): boolean {
+  if (!parsed || typeof parsed !== 'object') return false;
+  // Known legacy demo signatures from previous versions
+  if (parsed.id === 'demo-project-v1' || parsed.id === 'proj-complete-demo-v1') {
+    return true;
+  }
+  // Check if it's the unedited initial demo project without schemaVersion
+  if (
+    !parsed.schemaVersion &&
+    parsed.researchInput?.projectName === 'فانل أتمتة سير العمل للمصممين المستقلين' &&
+    parsed.customerJourney &&
+    parsed.funnelStrategy
+  ) {
+    return true;
+  }
+  return false;
+}
+
 export function createEmptyBuildProject(): AffiliateBuildProject {
   const emptyInput = createEmptyResearchInput();
   return {
+    schemaVersion: 2,
     id: `proj_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
     updatedAt: new Date().toISOString(),
     currentStage: 'INPUT',

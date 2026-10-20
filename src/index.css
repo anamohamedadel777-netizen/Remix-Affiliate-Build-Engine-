@@ -15,15 +15,29 @@
     --border-neutral: rgba(252, 252, 250, 0.08);
   }
 
-  html,
+  html {
+    background-color: #040405;
+    color: #FCFCFA;
+    overflow-y: auto;
+    overflow-x: clip;
+    scroll-behavior: smooth;
+  }
+
   body {
     background-color: #040405;
     color: #FCFCFA;
     font-family: 'Cairo', -apple-system, BlinkMacSystemFont, sans-serif;
-    overscroll-behavior-y: none;
-    overflow-x: hidden;
+    overflow: visible;
     -webkit-font-smoothing: antialiased;
     line-height: 1.65;
+    min-height: 100vh;
+  }
+
+  #root {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: clip;
   }
 
   .font-mono,

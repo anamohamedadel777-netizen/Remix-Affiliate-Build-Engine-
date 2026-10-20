@@ -14,6 +14,7 @@ import {
 interface Stage4LeadMagnetProps {
   leadMagnet: LeadMagnetData | null;
   onGenerateLeadMagnet: () => Promise<void>;
+  onGenerateLeadMagnetDetails?: () => Promise<void>;
   onSelectConcept: (conceptId: string) => void;
   onUpdatePromise: (newPromiseText: string, status: CopyStatus) => void;
   isLeadMagnetLocked: boolean;
@@ -27,6 +28,7 @@ interface Stage4LeadMagnetProps {
 export const Stage4LeadMagnet: React.FC<Stage4LeadMagnetProps> = ({
   leadMagnet,
   onGenerateLeadMagnet,
+  onGenerateLeadMagnetDetails,
   onSelectConcept,
   onUpdatePromise,
   isLeadMagnetLocked,
@@ -278,13 +280,26 @@ export const Stage4LeadMagnet: React.FC<Stage4LeadMagnetProps> = ({
 
       {/* Lead Magnet Content Architecture */}
       <div className="bg-[#0C0B0E] border border-white/10 rounded-xl p-6 space-y-5">
-        <div>
-          <h2 className="text-lg font-bold text-[#FCFCFA]">
-            الهيكل التفصيلي الجاهز للتنفيذ (Content Architecture)
-          </h2>
-          <p className="text-xs text-[#A39E93]">
-            نوع الهيكل: <bdi dir="ltr" className="text-[#F5BF1E] font-mono">{leadMagnet.contentArchitecture.formatType}</bdi>
-          </p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-[#FCFCFA]">
+              الهيكل التفصيلي الجاهز للتنفيذ (Content Architecture)
+            </h2>
+            <p className="text-xs text-[#A39E93]">
+              نوع الهيكل: <bdi dir="ltr" className="text-[#F5BF1E] font-mono">{leadMagnet.contentArchitecture.formatType}</bdi>
+            </p>
+          </div>
+          {onGenerateLeadMagnetDetails && (
+            <button
+              type="button"
+              disabled={isGenerating}
+              onClick={onGenerateLeadMagnetDetails}
+              className="px-3 py-1.5 bg-[#141216] hover:bg-[#23170D] border border-[#F5BF1E]/30 rounded-lg text-xs font-semibold text-[#FBD052] flex items-center gap-1.5 transition-colors"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>توليد وتوسيع الهيكل والجسر للعرض</span>
+            </button>
+          )}
         </div>
 
         <div className="space-y-4">

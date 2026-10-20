@@ -68,31 +68,43 @@ export function mapErrorToNormalizedCode(err: any): { code: NormalizedErrorCode;
     };
   }
 
+  // Model errors must be checked before generic API key errors so invalid models are not mislabeled as invalid keys
   if (
-    status === 401 ||
-    lower.includes('api_key_invalid') ||
-    lower.includes('invalid api key') ||
-    lower.includes('incorrect api key') ||
-    lower.includes('unauthorized') ||
-    lower.includes('authentication')
+    status === 404 ||
+    lower.includes('model_not_found') ||
+    lower.includes('does not exist') ||
+    lower.includes('is not found') ||
+    lower.includes('unknown model') ||
+    lower.includes('not available') ||
+    lower.includes('unsupported model') ||
+    lower.includes('invalid model') ||
+    (lower.includes('model') && (lower.includes('not found') || lower.includes('cannot be found') || lower.includes('not supported')))
   ) {
     return {
-      code: 'INVALID_API_KEY',
-      message: 'مفتاح API غير صالح أو غير معتمد لدى المزود. يرجى مراجعة المفتاح.'
+      code: 'MODEL_NOT_AVAILABLE',
+      message: 'الموديل المحدد غير متوفر أو غير متاح في حسابك لدى المزود.'
     };
   }
 
-  if (status === 403 || lower.includes('permission_denied') || lower.includes('forbidden')) {
+  if (status === 403 || lower.includes('permission_denied') || lower.includes('forbidden') || lower.includes('access_denied')) {
     return {
       code: 'PERMISSION_DENIED',
       message: 'تم رفض الإذن بالوصول إلى هذا الموديل أو الخدمة من حسابك.'
     };
   }
 
-  if (status === 404 || lower.includes('model_not_found') || lower.includes('not found') || lower.includes('unknown model')) {
+  if (
+    status === 401 ||
+    lower.includes('api_key_invalid') ||
+    lower.includes('invalid api key') ||
+    lower.includes('incorrect api key') ||
+    lower.includes('invalid_api_key') ||
+    lower.includes('unauthorized') ||
+    lower.includes('authentication')
+  ) {
     return {
-      code: 'MODEL_NOT_AVAILABLE',
-      message: 'الموديل المحدد غير متوفر أو غير متاح في حسابك لدى المزود.'
+      code: 'INVALID_API_KEY',
+      message: 'مفتاح API غير صالح أو غير معتمد لدى المزود. يرجى مراجعة المفتاح.'
     };
   }
 
@@ -451,21 +463,87 @@ export class AIProviderManager {
   }
 
   /**
-   * Test connection ping to verify user API key and model access
+   * Test connection ping to verify user API key and model access.
+   * Required order:
+   * 1. Provider selected.
+   * 2. API key supplied.
+   * 3. Attempt model discovery where supported.
+   * 4. Correct invalid selected model if needed.
+   * 5. Run minimal generation test with FINAL model.
    */
   public static async testConnection(config: AIConnectionConfig): Promise<{
     success: boolean;
     provider: string;
     model: string;
     messageAr: string;
+    discoveredModels?: string[];
     error?: { code: NormalizedErrorCode; message: string };
   }> {
+    // 1. Provider selected
+    if (!config.provider) {
+      return {
+        success: false,
+        provider: 'unknown',
+        model: config.model || '',
+        messageAr: 'يرجى اختيار مزود الذكاء الاصطناعي.',
+        error: { code: 'MISSING_PROVIDER_CONFIG', message: 'لم يتم اختيار المزود.' }
+      };
+    }
+
+    // 2. API key supplied
+    if (!config.apiKey || !config.apiKey.trim()) {
+      return {
+        success: false,
+        provider: config.provider,
+        model: config.model || '',
+        messageAr: 'يرجى إدخال مفتاح الـAPI.',
+        error: { code: 'MISSING_PROVIDER_CONFIG', message: 'يرجى إدخال مفتاح الـAPI.' }
+      };
+    }
+
+    // 3. Attempt model discovery where supported
+    let discovered: string[] = [];
+    try {
+      discovered = await this.discoverModels(config);
+    } catch {
+      // Discovery error alone should not fail test if model is supplied
+    }
+
+    // 4. Correct invalid selected model if needed
+    let finalModel = (config.model || '').trim();
+    if (discovered.length > 0) {
+      if (!finalModel || !discovered.includes(finalModel)) {
+        finalModel = discovered[0];
+      }
+    }
+
+    if (!finalModel) {
+      if (config.provider === 'openai-compatible') {
+        return {
+          success: false,
+          provider: config.provider,
+          model: '',
+          messageAr: 'يرجى إدخال اسم الموديل يدويًا أو تحديث قائمة الموديلات.',
+          error: { code: 'INVALID_MODEL', message: 'اسم الموديل مطلوب للمزود المخصص.' }
+        };
+      }
+      finalModel =
+        config.provider === 'gemini'
+          ? 'gemini-2.5-flash'
+          : config.provider === 'openai'
+          ? 'gpt-4o'
+          : 'claude-3-5-sonnet-20241022';
+    }
+
+    const finalConfig = { ...config, model: finalModel };
+
+    // 5. Run minimal generation test with FINAL model
     const testReqId = generateRequestId('req_test');
     const result = await this.generateStructured<{ status: string }>({
       task: 'TEST_CONNECTION',
       prompt: 'Respond with valid JSON: {"status": "ok"}',
       systemInstruction: 'Respond only with {"status": "ok"}',
-      connectionConfig: config,
+      connectionConfig: finalConfig,
       requestId: testReqId,
       timeoutMs: 15000
     });
@@ -473,15 +551,17 @@ export class AIProviderManager {
     if (result.success) {
       return {
         success: true,
-        provider: config.provider,
-        model: config.model,
+        provider: finalConfig.provider,
+        model: finalConfig.model,
+        discoveredModels: discovered,
         messageAr: 'تم التحقق من الاتصال بنجاح بالمزود والموديل المختار.'
       };
     } else {
       return {
         success: false,
-        provider: config.provider,
-        model: config.model,
+        provider: finalConfig.provider,
+        model: finalConfig.model,
+        discoveredModels: discovered,
         messageAr: result.error?.message || 'تعذر الاتصال بالمزود.',
         error: result.error
       };
@@ -489,12 +569,39 @@ export class AIProviderManager {
   }
 
   /**
-   * Model Discovery: fetch live model list where supported or curated live models
+   * Model Discovery: live model discovery whenever technically supported
    */
   public static async discoverModels(config: AIConnectionConfig): Promise<string[]> {
     const provider = config.provider;
 
+    // 1. Google Gemini: Live discovery via @google/genai SDK
     if (provider === 'gemini') {
+      try {
+        const ai = new GoogleGenAI({
+          apiKey: config.apiKey,
+          httpOptions: { headers: { 'User-Agent': 'rbtls-affiliate-build-engine' } }
+        });
+        const pager = await ai.models.list();
+        const liveModels: string[] = [];
+        for await (const m of pager) {
+          const rawName = (m as any).name || '';
+          const name = rawName.replace(/^models\//, '');
+          const methods = (m as any).supportedGenerationMethods || [];
+          if (
+            name &&
+            (name.includes('gemini') || methods.includes('generateContent')) &&
+            !name.includes('embedding') &&
+            !name.includes('aqa')
+          ) {
+            liveModels.push(name);
+          }
+        }
+        if (liveModels.length > 0) {
+          return liveModels.sort();
+        }
+      } catch (err: any) {
+        console.log('[AI_DISCOVERY] Gemini live discovery fallback:', err?.message || err);
+      }
       return [
         'gemini-2.5-flash',
         'gemini-2.5-pro',
@@ -504,6 +611,7 @@ export class AIProviderManager {
       ];
     }
 
+    // 2. OpenAI: Live discovery with future-safe non-chat filtering
     if (provider === 'openai') {
       try {
         const res = await fetch('https://api.openai.com/v1/models', {
@@ -511,19 +619,48 @@ export class AIProviderManager {
         });
         if (res.ok) {
           const data = await res.json();
+          const nonChatKeywords = [
+            'whisper',
+            'tts',
+            'dall-e',
+            'embedding',
+            'moderation',
+            'babbage',
+            'davinci',
+            'curie',
+            'ada',
+            'realtime',
+            'audio'
+          ];
           const ids: string[] = (data.data || [])
             .map((m: any) => m.id)
-            .filter((id: string) => id.startsWith('gpt-') || id.startsWith('o1') || id.startsWith('o3'))
+            .filter((id: string) => !nonChatKeywords.some((kw) => id.toLowerCase().includes(kw)))
             .sort();
           if (ids.length > 0) return ids;
         }
-      } catch {
-        // Fallback to recommended OpenAI list
+      } catch (err: any) {
+        console.log('[AI_DISCOVERY] OpenAI live discovery fallback:', err?.message || err);
       }
-      return ['gpt-4o', 'gpt-4o-mini', 'o3-mini', 'gpt-4-turbo'];
+      return ['gpt-4o', 'gpt-4o-mini', 'o3-mini', 'o1', 'gpt-4-turbo'];
     }
 
+    // 3. Anthropic: Live discovery via GET /v1/models if supported
     if (provider === 'anthropic') {
+      try {
+        const res = await fetch('https://api.anthropic.com/v1/models', {
+          headers: {
+            'x-api-key': config.apiKey,
+            'anthropic-version': '2023-06-01'
+          }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const ids: string[] = (data.data || []).map((m: any) => m.id).filter(Boolean).sort();
+          if (ids.length > 0) return ids;
+        }
+      } catch (err: any) {
+        console.log('[AI_DISCOVERY] Anthropic live discovery fallback:', err?.message || err);
+      }
       return [
         'claude-3-5-sonnet-20241022',
         'claude-3-5-haiku-20241022',
@@ -531,25 +668,34 @@ export class AIProviderManager {
       ];
     }
 
+    // 4. Custom / OpenAI-Compatible Provider: fetch from baseUrl
     if (provider === 'openai-compatible') {
-      // Try to fetch ${baseUrl}/models
       let baseUrl = (config.baseUrl || '').trim().replace(/\/+$/, '');
       if (baseUrl) {
-        try {
-          const modelsUrl = baseUrl.endsWith('/v1') ? `${baseUrl}/models` : `${baseUrl}/v1/models`;
-          const res = await fetch(modelsUrl, {
-            headers: { Authorization: `Bearer ${config.apiKey}` }
-          });
-          if (res.ok) {
-            const data = await res.json();
-            const ids: string[] = (data.data || []).map((m: any) => m.id).filter(Boolean);
-            if (ids.length > 0) return ids;
+        const candidateEndpoints = [
+          baseUrl.endsWith('/v1') ? `${baseUrl}/models` : `${baseUrl}/v1/models`,
+          `${baseUrl}/models`
+        ];
+        for (const url of candidateEndpoints) {
+          try {
+            const res = await fetch(url, {
+              headers: { Authorization: `Bearer ${config.apiKey}` }
+            });
+            if (res.ok) {
+              const data = await res.json();
+              const rawList = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : [];
+              const ids: string[] = rawList
+                .map((m: any) => (typeof m === 'string' ? m : m.id || m.name))
+                .filter(Boolean);
+              if (ids.length > 0) return ids;
+            }
+          } catch {
+            // Try next candidate endpoint
           }
-        } catch {
-          // Fallback
         }
       }
-      return config.model ? [config.model] : ['custom-model'];
+      // If discovery fails, do NOT reject API key; allow manual model entry
+      return config.model ? [config.model] : [];
     }
 
     return [];

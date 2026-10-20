@@ -104,6 +104,7 @@ app.post('/api/ai/test-connection', async (req, res) => {
     requestId: generateRequestId('req_test'),
     provider: result.provider,
     model: result.model,
+    discoveredModels: result.discoveredModels,
     data: { message: result.messageAr },
     error: result.error
   });
@@ -210,17 +211,54 @@ app.post('/api/build/parse-brief', async (req, res) => {
 });
 
 // 2. Stage 1 — Customer Journey Architect + Awareness Engine + Message Match
+// Supports: mode: 'journey_strategy' (Fast decision first) | mode: 'journey_details' (On-demand expansion)
 app.post('/api/build/journey', async (req, res) => {
   const requestId = generateRequestId('req_journey');
   const config = extractConnectionConfig(req);
-  const { researchInput, lockedElements } = req.body;
+  const { researchInput, lockedElements, mode = 'journey_strategy', selectedStepOrder } = req.body;
 
-  const prompt = `بناءً على مدخلات البحث التالية، قم بتصميم رحلة العميل الكاملة (Customer Journey Architect)، ومحرك الوعي (Awareness Engine)، وسلسلة تطابق الرسالة (Message Match Chain):
-${JSON.stringify(researchInput, null, 2)}
+  if (mode === 'journey_details') {
+    const prompt = `أنت تصمم تفاصيل إضافية وتشخيصاً معمقاً لمرحلة محددة في رحلة العميل (Customer Journey Deep Diagnostics):
+المدخلات: ${JSON.stringify(researchInput)}
+المرحلة المستهدفة: ${selectedStepOrder || 1}
+قم بتقديم تفاصيل سلوكية ونفسية دقيقة ومكثفة لتلك المرحلة بدون إطالة زائدة.`;
+
+    const result = await AIProviderManager.generateStructured({
+      task: 'GENERATE_JOURNEY_DETAILS',
+      systemInstruction: SYSTEM_BASE_PROMPT,
+      prompt,
+      schema: {
+        type: Type.OBJECT,
+        properties: {
+          stepOrder: { type: Type.INTEGER },
+          deepMindsetAnalysisAr: { type: Type.STRING },
+          recommendedFrictionReducersAr: { type: Type.ARRAY, items: { type: Type.STRING } },
+          trustSignalsNeededAr: { type: Type.ARRAY, items: { type: Type.STRING } },
+          microCommitmentAdviceAr: { type: Type.STRING }
+        },
+        required: [
+          'stepOrder',
+          'deepMindsetAnalysisAr',
+          'recommendedFrictionReducersAr',
+          'trustSignalsNeededAr',
+          'microCommitmentAdviceAr'
+        ]
+      },
+      connectionConfig: config,
+      requestId
+    });
+
+    return res.json(result);
+  }
+
+  // Fast Decision First: journey_strategy
+  const prompt = `بناءً على مدخلات البحث، قم بإنشاء استراتيجية رحلة العميل السريعة وعالية الأثر (Customer Journey Strategy):
+المطلوب إجابة مركزة وسريعة (Concise & High-Impact) بدون حشو إنشائي لتمكين الطالب من اتخاذ القرار فوراً:
+البحث: ${JSON.stringify(researchInput, null, 2)}
 العناصر المقفلة: ${JSON.stringify(lockedElements || {})}`;
 
   const result = await AIProviderManager.generateStructured({
-    task: 'GENERATE_JOURNEY',
+    task: 'GENERATE_JOURNEY_STRATEGY',
     systemInstruction: SYSTEM_BASE_PROMPT,
     prompt,
     schema: {
@@ -335,18 +373,81 @@ ${JSON.stringify(researchInput, null, 2)}
   return res.json(result);
 });
 
-// 3. Stage 2 — Funnel Strategy (Fix: confirmedByStudent is always false upon AI generation)
+// 3. Stage 2 — Funnel Strategy (Supports: mode: 'funnel_options' | mode: 'funnel_details')
+// Critical: confirmedByStudent is always false upon AI generation
 app.post('/api/build/funnel', async (req, res) => {
   const requestId = generateRequestId('req_funnel');
   const config = extractConnectionConfig(req);
-  const { researchInput, customerJourney } = req.body;
+  const { researchInput, customerJourney, mode = 'funnel_options', selectedFunnelId } = req.body;
 
-  const prompt = `بناءً على مدخلات البحث ورحلة العميل التالية، قيّم 4 نماذج فانل مختلفة (من بين: Direct Affiliate Funnel, Lead Magnet Funnel, Bridge Funnel, Content-to-Email Funnel, Quiz Funnel, Comparison Funnel, Review Funnel, Webinar Funnel, Tool Funnel)، واختر الأنسب مع بناء خريطة الفانل (Funnel Map) وأقل فانل قابل للتشغيل (Minimum Viable Funnel):
+  if (mode === 'funnel_details') {
+    const prompt = `أنت مهندس الفانل المعماري (Funnel Architect). قم ببناء خريطة تدفق الفانل البصرية الكاملة والنسخة المصغرة القابلة للتشغيل (Minimum Viable Funnel) للنموذج المختار:
+الفانل المختار: ${selectedFunnelId || 'النموذج الموصى به'}
+البحث: ${JSON.stringify(researchInput)}
+رحلة العميل: ${JSON.stringify(customerJourney)}`;
+
+    const result = await AIProviderManager.generateStructured({
+      task: 'GENERATE_FUNNEL_DETAILS',
+      systemInstruction: SYSTEM_BASE_PROMPT,
+      prompt,
+      schema: {
+        type: Type.OBJECT,
+        properties: {
+          funnelMapNodes: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                id: { type: Type.STRING },
+                order: { type: Type.INTEGER },
+                nodeTitleAr: { type: Type.STRING },
+                nodeTypeEn: { type: Type.STRING },
+                purpose: { type: Type.STRING },
+                visitorQuestion: { type: Type.STRING },
+                mainMessage: { type: Type.STRING },
+                cta: { type: Type.STRING },
+                trackingEvent: { type: Type.STRING }
+              },
+              required: [
+                'id',
+                'order',
+                'nodeTitleAr',
+                'nodeTypeEn',
+                'purpose',
+                'visitorQuestion',
+                'mainMessage',
+                'cta',
+                'trackingEvent'
+              ]
+            }
+          },
+          minimumViableFunnel: {
+            type: Type.OBJECT,
+            properties: {
+              minimumBuild: { type: Type.ARRAY, items: { type: Type.STRING } },
+              optionalLater: { type: Type.ARRAY, items: { type: Type.STRING } },
+              scaleVersion: { type: Type.ARRAY, items: { type: Type.STRING } },
+              overbuildWarningAr: { type: Type.STRING }
+            },
+            required: ['minimumBuild', 'optionalLater', 'scaleVersion', 'overbuildWarningAr']
+          }
+        },
+        required: ['funnelMapNodes', 'minimumViableFunnel']
+      },
+      connectionConfig: config,
+      requestId
+    });
+
+    return res.json(result);
+  }
+
+  // Phase A: funnel_options (Fast Decision First)
+  const prompt = `بناءً على مدخلات البحث ورحلة العميل، قيّم 4 نماذج فانل مختلفة على 10 أبعاد، واختر الأنسب مع تقديم خريطة الفانل والنسخة المصغرة بسرعة ودقة:
 البحث: ${JSON.stringify(researchInput)}
 رحلة العميل: ${JSON.stringify(customerJourney)}`;
 
   const result = await AIProviderManager.generateStructured({
-    task: 'GENERATE_FUNNEL',
+    task: 'GENERATE_FUNNEL_OPTIONS',
     systemInstruction: SYSTEM_BASE_PROMPT,
     prompt,
     schema: {
@@ -480,18 +581,109 @@ app.post('/api/build/funnel', async (req, res) => {
   return res.json(result);
 });
 
-// 4. Stage 3 — Lead Magnet Engine
+// 4. Stage 3 — Lead Magnet Engine (Supports: mode: 'lead_magnet_options' | mode: 'lead_magnet_details')
 app.post('/api/build/lead-magnet', async (req, res) => {
   const requestId = generateRequestId('req_leadmagnet');
   const config = extractConnectionConfig(req);
-  const { researchInput, customerJourney, funnelStrategy } = req.body;
+  const {
+    researchInput,
+    customerJourney,
+    funnelStrategy,
+    mode = 'lead_magnet_options',
+    selectedConceptId,
+    selectedConcept
+  } = req.body;
 
-  const prompt = `بناءً على البحث ورحلة العميل والفانل المختار، ابتكر 5 أفكار Lead Magnet متنوعة الصيغ (Checklist, Calculator, Template, Quiz, Comparison Guide, Swipe File, Decision Framework) وقيمها من 0 إلى 10 في الأبعاد العشرة، ثم ابنِ الوعد والهيكل التفصيلي الكامل والجسر المنطقي نحو العرض:
+  if (mode === 'lead_magnet_details') {
+    const prompt = `أنت مهندس الـLead Magnet المعماري (Lead Magnet Architect). قم ببناء الهيكل التفصيلي القابل للتنفيذ (Content Architecture)، وصياغة الوعد النهائي المعتمد (Promise Statement)، والجسر الاستراتيجي المحكم نحو العرض (Strategic Offer Bridge) للمفهوم المختار:
+المفهوم المختار: ${JSON.stringify(selectedConcept || { id: selectedConceptId })}
+البحث: ${JSON.stringify(researchInput)}
+الفانل المعتمد: ${JSON.stringify(funnelStrategy?.primaryFunnelId)}`;
+
+    const result = await AIProviderManager.generateStructured({
+      task: 'GENERATE_LEAD_MAGNET_DETAILS',
+      systemInstruction: SYSTEM_BASE_PROMPT,
+      prompt,
+      schema: {
+        type: Type.OBJECT,
+        properties: {
+          promiseStatement: {
+            type: Type.OBJECT,
+            properties: {
+              specificProblem: { type: Type.STRING },
+              usefulOutcome: { type: Type.STRING },
+              reasonableTimeEffort: { type: Type.STRING },
+              fullPromiseAr: { type: Type.STRING }
+            },
+            required: [
+              'specificProblem',
+              'usefulOutcome',
+              'reasonableTimeEffort',
+              'fullPromiseAr'
+            ]
+          },
+          contentArchitecture: {
+            type: Type.OBJECT,
+            properties: {
+              formatType: { type: Type.STRING },
+              sections: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    sectionNameAr: { type: Type.STRING },
+                    sectionRoleEn: { type: Type.STRING },
+                    detailsAr: { type: Type.STRING },
+                    actionableItems: {
+                      type: Type.ARRAY,
+                      items: { type: Type.STRING }
+                    }
+                  },
+                  required: ['sectionNameAr', 'sectionRoleEn', 'detailsAr', 'actionableItems']
+                }
+              },
+              ctaInsideAsset: { type: Type.STRING }
+            },
+            required: ['formatType', 'sections', 'ctaInsideAsset']
+          },
+          offerBridge: {
+            type: Type.OBJECT,
+            properties: {
+              leadMagnetProblem: { type: Type.STRING },
+              insightDelivered: { type: Type.STRING },
+              remainingGap: { type: Type.STRING },
+              solutionCategory: { type: Type.STRING },
+              offerConnection: { type: Type.STRING }
+            },
+            required: [
+              'leadMagnetProblem',
+              'insightDelivered',
+              'remainingGap',
+              'solutionCategory',
+              'offerConnection'
+            ]
+          }
+        },
+        required: ['promiseStatement', 'contentArchitecture', 'offerBridge']
+      },
+      connectionConfig: config,
+      requestId
+    });
+
+    if (result.success && result.data && result.data.promiseStatement) {
+      result.data.promiseStatement.status = 'APPROVED';
+    }
+
+    return res.json(result);
+  }
+
+  // Phase A: lead_magnet_options (Fast Decision First)
+  const prompt = `بناءً على البحث ورحلة العميل والفانل، ابتكر 5 أفكار Lead Magnet متنوعة الصيغ وقيمها في الأبعاد العشرة، مع صياغة الوعد المبدئي لكل منها بسرعة ودقة:
 البحث: ${JSON.stringify(researchInput)}
 الفانل المختار: ${JSON.stringify(funnelStrategy?.primaryFunnelId)}`;
 
   const result = await AIProviderManager.generateStructured({
-    task: 'GENERATE_LEAD_MAGNET',
+    task: 'GENERATE_LEAD_MAGNET_OPTIONS',
     systemInstruction: SYSTEM_BASE_PROMPT,
     prompt,
     schema: {
@@ -634,26 +826,203 @@ app.post('/api/build/lead-magnet', async (req, res) => {
   return res.json(result);
 });
 
-// 5. Stage 4 — Page Architect & Copy Generator
+// 5. Stage 4 — Page Architect & Copy Generator (Supports: mode: 'pages_strategy' | mode: 'page_details')
 app.post('/api/build/pages', async (req, res) => {
   const requestId = generateRequestId('req_pages');
   const config = extractConnectionConfig(req);
-  const { researchInput, leadMagnet, proofLibrary } = req.body;
+  const {
+    researchInput,
+    leadMagnet,
+    proofLibrary,
+    mode = 'pages_strategy',
+    selectedHeadlineId,
+    headlineText
+  } = req.body;
 
-  const prompt = `بناءً على البحث والـLead Magnet المختار ومكتبة الإثبات، ابنِ:
-1. خريطة الصفحات المطلوبة (Page Purpose Map)
-2. محرك العناوين (10 عناوين بزوايا مختلفة وتقييمها)
-3. هيكل ونصوص صفحة الهبوط (Landing Page Copy) بدون اختلاق شهادات
-4. هيكل ونصوص صفحة الشكر (Thank You Page)
-5. هيكل ونصوص صفحة الجسر (Bridge Page) مع إفصاح الأفلييت الشفاف
-6. هيكل صفحة المقارنة/المراجعة (Review / Comparison Page)
-7. فحص الادعاءات (Claims Audit)
+  if (mode === 'page_details') {
+    const prompt = `أنت كاتب نصوص تحويلية ومهندس صفحات مباشر (Direct-Response Page Copywriter). قم بصياغة النصوص الكاملة لصفحة الهبوط والشكر والجسر والمقارنة بناءً على العنوان المختار:
+العنوان المختار: ${headlineText || selectedHeadlineId || 'العنوان الرئيسي الموصى به'}
 البحث: ${JSON.stringify(researchInput)}
 الـLead Magnet: ${JSON.stringify(leadMagnet?.promiseStatement)}
-مكتبة الإثبات الموثقة فقط: ${JSON.stringify(proofLibrary || [])}`;
+مكتبة الإثبات: ${JSON.stringify(proofLibrary || [])}
+قواعد: بدون شهادات وهمية، بدون وعود ثراء سريع، ومع إفصاح أفلييت شفاف.`;
+
+    const result = await AIProviderManager.generateStructured({
+      task: 'GENERATE_PAGE_DETAILS',
+      systemInstruction: SYSTEM_BASE_PROMPT,
+      prompt,
+      schema: {
+        type: Type.OBJECT,
+        properties: {
+          landingPage: {
+            type: Type.OBJECT,
+            properties: {
+              selectedHeadlineId: { type: Type.STRING },
+              headlineAr: { type: Type.STRING },
+              subheadlineAr: { type: Type.STRING },
+              supportingCopyAr: { type: Type.STRING },
+              whatYouGetBullets: { type: Type.ARRAY, items: { type: Type.STRING } },
+              whyItMattersAr: { type: Type.STRING },
+              whoItIsForAr: { type: Type.ARRAY, items: { type: Type.STRING } },
+              whoItIsNotForAr: { type: Type.ARRAY, items: { type: Type.STRING } },
+              credibilityPlaceholderAr: { type: Type.STRING },
+              ctaButtonTextAr: { type: Type.STRING },
+              privacyMicrocopyAr: { type: Type.STRING },
+              objectionHandlingAr: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    objection: { type: Type.STRING },
+                    response: { type: Type.STRING }
+                  },
+                  required: ['objection', 'response']
+                }
+              },
+              faqItems: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    question: { type: Type.STRING },
+                    answer: { type: Type.STRING }
+                  },
+                  required: ['question', 'answer']
+                }
+              },
+              mobileNotesAr: { type: Type.ARRAY, items: { type: Type.STRING } }
+            },
+            required: [
+              'headlineAr',
+              'subheadlineAr',
+              'supportingCopyAr',
+              'whatYouGetBullets',
+              'whyItMattersAr',
+              'whoItIsForAr',
+              'whoItIsNotForAr',
+              'credibilityPlaceholderAr',
+              'ctaButtonTextAr',
+              'privacyMicrocopyAr',
+              'objectionHandlingAr',
+              'faqItems',
+              'mobileNotesAr'
+            ]
+          },
+          thankYouPage: {
+            type: Type.OBJECT,
+            properties: {
+              primaryObjectiveAr: { type: Type.STRING },
+              deliveryInstructionAr: { type: Type.STRING },
+              expectationSettingAr: { type: Type.STRING },
+              microCommitmentAskAr: { type: Type.STRING },
+              offerPreFrameAr: { type: Type.STRING },
+              whitelistInstructionAr: { type: Type.STRING },
+              nextStepCtaAr: { type: Type.STRING }
+            },
+            required: [
+              'primaryObjectiveAr',
+              'deliveryInstructionAr',
+              'expectationSettingAr',
+              'microCommitmentAskAr',
+              'offerPreFrameAr',
+              'whitelistInstructionAr',
+              'nextStepCtaAr'
+            ]
+          },
+          bridgePage: {
+            type: Type.OBJECT,
+            properties: {
+              isStrategicallyRequired: { type: Type.BOOLEAN },
+              problemRecapAr: { type: Type.STRING },
+              whatToLookForAr: { type: Type.STRING },
+              whySolutionCategoryMattersAr: { type: Type.STRING },
+              productIntroductionAr: { type: Type.STRING },
+              pros: { type: Type.ARRAY, items: { type: Type.STRING } },
+              potentialLimitations: { type: Type.ARRAY, items: { type: Type.STRING } },
+              whoItSuitsAr: { type: Type.ARRAY, items: { type: Type.STRING } },
+              whoItMayNotSuitAr: { type: Type.ARRAY, items: { type: Type.STRING } },
+              ctaTextAr: { type: Type.STRING },
+              affiliateDisclosureAr: { type: Type.STRING }
+            },
+            required: [
+              'isStrategicallyRequired',
+              'problemRecapAr',
+              'whatToLookForAr',
+              'whySolutionCategoryMattersAr',
+              'productIntroductionAr',
+              'pros',
+              'potentialLimitations',
+              'whoItSuitsAr',
+              'whoItMayNotSuitAr',
+              'ctaTextAr',
+              'affiliateDisclosureAr'
+            ]
+          },
+          reviewComparisonPage: {
+            type: Type.OBJECT,
+            properties: {
+              isIncluded: { type: Type.BOOLEAN },
+              pageType: { type: Type.STRING },
+              decisionCriteria: { type: Type.ARRAY, items: { type: Type.STRING } },
+              featureComparisonRows: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    feature: { type: Type.STRING },
+                    offerNote: { type: Type.STRING },
+                    alternativeNote: { type: Type.STRING }
+                  },
+                  required: ['feature', 'offerNote', 'alternativeNote']
+                }
+              },
+              useCasesAr: { type: Type.ARRAY, items: { type: Type.STRING } },
+              limitationsAr: { type: Type.ARRAY, items: { type: Type.STRING } },
+              pricingVerificationNoteAr: { type: Type.STRING },
+              affiliateDisclosureAr: { type: Type.STRING },
+              ctaAr: { type: Type.STRING }
+            },
+            required: [
+              'isIncluded',
+              'pageType',
+              'decisionCriteria',
+              'featureComparisonRows',
+              'useCasesAr',
+              'limitationsAr',
+              'pricingVerificationNoteAr',
+              'affiliateDisclosureAr',
+              'ctaAr'
+            ]
+          }
+        },
+        required: [
+          'landingPage',
+          'thankYouPage',
+          'bridgePage',
+          'reviewComparisonPage'
+        ]
+      },
+      connectionConfig: config,
+      requestId
+    });
+
+    if (result.success && result.data) {
+      if (result.data.landingPage) result.data.landingPage.status = 'REVIEW';
+      if (result.data.thankYouPage) result.data.thankYouPage.status = 'REVIEW';
+      if (result.data.bridgePage) result.data.bridgePage.status = 'REVIEW';
+      result.data.claimsAudit = [];
+    }
+
+    return res.json(result);
+  }
+
+  // Phase A: pages_strategy (Fast Decision First)
+  const prompt = `بناءً على البحث والـLead Magnet، حدد خريطة الصفحات المطلوبة (Page Purpose Map) و10 عناوين مقترحة بزوايا مختلفة مع هيكل مبدئي للصفحات بسرعة ودقة:
+البحث: ${JSON.stringify(researchInput)}
+الـLead Magnet: ${JSON.stringify(leadMagnet?.promiseStatement)}`;
 
   const result = await AIProviderManager.generateStructured({
-    task: 'GENERATE_PAGES',
+    task: 'GENERATE_PAGES_STRATEGY',
     systemInstruction: SYSTEM_BASE_PROMPT,
     prompt,
     schema: {
@@ -888,19 +1257,88 @@ app.post('/api/build/pages', async (req, res) => {
   return res.json(result);
 });
 
-// 6. Stage 5 — Email System
+// 6. Stage 5 — Email System (Supports: mode: 'email_strategy' | mode: 'email_details')
 app.post('/api/build/email', async (req, res) => {
   const requestId = generateRequestId('req_email');
   const config = extractConnectionConfig(req);
-  const { researchInput, leadMagnet, pages } = req.body;
+  const { researchInput, leadMagnet, pages, emailSystem, mode = 'email_strategy' } = req.body;
 
-  const prompt = `بناءً على مدخلات البحث والـLead Magnet والصفحات، صمّم استراتيجية الإيميل، وحدد العدد الأنسب من الإيميلات مع السبب، ثم ابنِ مخطط السلسلة (Email Blueprint) والنصوص الكاملة للإيميلات بالعربية الطبيعية مع خيارات عناوين متعددة لكل إيميل:
+  if (mode === 'email_details') {
+    const prompt = `أنت كاتب إيميلات احترافي (Direct-Response Email Copywriter). قم بصياغة نصوص الإيميلات الكاملة لجميع الإيميلات الواردة في المخطط بالعربية الطبيعية، بدون حشو، مع 3 خيارات عناوين لكل إيميل وفحص التضليل:
+البحث: ${JSON.stringify(researchInput)}
+المخطط المعتمد: ${JSON.stringify(emailSystem?.blueprint || [])}
+وعد الـLead Magnet: ${JSON.stringify(leadMagnet?.promiseStatement)}`;
+
+    const result = await AIProviderManager.generateStructured({
+      task: 'GENERATE_EMAIL_DETAILS',
+      systemInstruction: SYSTEM_BASE_PROMPT,
+      prompt,
+      schema: {
+        type: Type.OBJECT,
+        properties: {
+          emailsCopy: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                emailNumber: { type: Type.INTEGER },
+                subjectLineAr: { type: Type.STRING },
+                subjectOptions: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      mechanismEn: { type: Type.STRING },
+                      mechanismAr: { type: Type.STRING },
+                      subjectAr: { type: Type.STRING },
+                      isDeceptiveRisk: { type: Type.BOOLEAN }
+                    },
+                    required: ['mechanismEn', 'mechanismAr', 'subjectAr', 'isDeceptiveRisk']
+                  }
+                },
+                previewTextAr: { type: Type.STRING },
+                openingAr: { type: Type.STRING },
+                bodyAr: { type: Type.STRING },
+                ctaTextAr: { type: Type.STRING },
+                psTextAr: { type: Type.STRING }
+              },
+              required: [
+                'emailNumber',
+                'subjectLineAr',
+                'subjectOptions',
+                'previewTextAr',
+                'openingAr',
+                'bodyAr',
+                'ctaTextAr',
+                'psTextAr'
+              ]
+            }
+          }
+        },
+        required: ['emailsCopy']
+      },
+      connectionConfig: config,
+      requestId
+    });
+
+    if (result.success && result.data && Array.isArray(result.data.emailsCopy)) {
+      result.data.emailsCopy = result.data.emailsCopy.map((e: any) => ({
+        ...e,
+        status: 'REVIEW'
+      }));
+    }
+
+    return res.json(result);
+  }
+
+  // Phase A: email_strategy (Fast Decision First)
+  const prompt = `بناءً على مدخلات البحث والـLead Magnet، حدد استراتيجية الإيميل وسبب اختيار الطول ومخطط السلسلة (Email Blueprint) مع مسودات أولية سريعة:
 البحث: ${JSON.stringify(researchInput)}
 وعد الـLead Magnet: ${JSON.stringify(leadMagnet?.promiseStatement)}
 صفحة الجسر: ${JSON.stringify(pages?.bridgePage?.productIntroductionAr)}`;
 
   const result = await AIProviderManager.generateStructured({
-    task: 'GENERATE_EMAIL',
+    task: 'GENERATE_EMAIL_STRATEGY',
     systemInstruction: SYSTEM_BASE_PROMPT,
     prompt,
     schema: {
@@ -1022,20 +1460,72 @@ app.post('/api/build/email', async (req, res) => {
   return res.json(result);
 });
 
-// 7. Stage 6 — Automation Architect
+// 7. Stage 6 — Automation Architect (Supports: mode: 'automation_strategy' | mode: 'automation_details')
 app.post('/api/build/automation', async (req, res) => {
   const requestId = generateRequestId('req_automation');
   const config = extractConnectionConfig(req);
-  const { researchInput, leadMagnet, emailSystem, selectedPlatform } = req.body;
+  const {
+    researchInput,
+    leadMagnet,
+    emailSystem,
+    selectedPlatform = 'Platform-Agnostic',
+    mode = 'automation_strategy'
+  } = req.body;
 
-  const prompt = `صمّم نظام الأتمتة الكامل (Automation Architect) ونظام التاجات القياسي (بالصيغة SOURCE | ..., LEAD | ..., ENGAGED | ..., INTENT | ..., CUSTOMER | ..., STAGE | ...) وشروط الخروج الآمنة لمنع إرسال رسائل بيع للمشترين أو الدخول في حلقات لا نهائية.
-المنصة المختارة: ${selectedPlatform || 'Platform-Agnostic'}
+  if (mode === 'automation_details') {
+    const prompt = `أنت مهندس الأتمتة المعماري (Automation Architect). قم بتصميم تفاصيل عقد سير العمل (Workflow Nodes) والترجمة التقنية لمنصة ${selectedPlatform}:
+المنصة المختارة: ${selectedPlatform}
 البحث: ${JSON.stringify(researchInput)}
-الـLead Magnet: ${JSON.stringify(leadMagnet?.promiseStatement?.fullPromiseAr)}
+عدد الإيميلات: ${emailSystem?.blueprint?.length || 5}
+التاجات المعتمدة: ${JSON.stringify(emailSystem?.strategy?.whyUserJoined || '')}`;
+
+    const result = await AIProviderManager.generateStructured({
+      task: 'GENERATE_AUTOMATION_DETAILS',
+      systemInstruction: SYSTEM_BASE_PROMPT,
+      prompt,
+      schema: {
+        type: Type.OBJECT,
+        properties: {
+          workflowNodes: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                id: { type: Type.STRING },
+                order: { type: Type.INTEGER },
+                stepType: {
+                  type: Type.STRING,
+                  description: 'TRIGGER, ACTION, DELAY, CONDITION, GOAL, or EXIT'
+                },
+                titleAr: { type: Type.STRING },
+                detailAr: { type: Type.STRING },
+                yesBranchAr: { type: Type.STRING },
+                noBranchAr: { type: Type.STRING },
+                tagInvolved: { type: Type.STRING }
+              },
+              required: ['id', 'order', 'stepType', 'titleAr', 'detailAr']
+            }
+          },
+          platformTranslationNotesAr: { type: Type.ARRAY, items: { type: Type.STRING } }
+        },
+        required: ['workflowNodes', 'platformTranslationNotesAr']
+      },
+      connectionConfig: config,
+      requestId
+    });
+
+    return res.json(result);
+  }
+
+  // Phase A: automation_strategy (Fast Decision First)
+  const prompt = `صمّم نظام الأتمتة والتاجات القياسي (SOURCE, LEAD, ENGAGED, INTENT, CUSTOMER, STAGE) وشروط الخروج الآمنة بسرعة ودقة:
+المنصة المختارة: ${selectedPlatform}
+البحث: ${JSON.stringify(researchInput)}
+وعد الـLead Magnet: ${JSON.stringify(leadMagnet?.promiseStatement?.fullPromiseAr)}
 عدد الإيميلات: ${emailSystem?.blueprint?.length || 5}`;
 
   const result = await AIProviderManager.generateStructured({
-    task: 'GENERATE_AUTOMATION',
+    task: 'GENERATE_AUTOMATION_STRATEGY',
     systemInstruction: SYSTEM_BASE_PROMPT,
     prompt,
     schema: {
@@ -1117,7 +1607,7 @@ app.post('/api/build/automation', async (req, res) => {
   });
 
   if (result.success && result.data) {
-    result.data.selectedPlatform = selectedPlatform || 'Platform-Agnostic';
+    result.data.selectedPlatform = selectedPlatform;
     result.data.safetyChecks = [];
   }
 

@@ -26,7 +26,8 @@ import {
   createEmptyResearchInput,
   checkStageAccess,
   invalidateDownstream,
-  sanitizeProjectForExport
+  sanitizeProjectForExport,
+  isLegacyDemoProject
 } from './utils/projectState';
 import { RESEARCH_PROJECT_PRESETS } from './data/presets';
 import {
@@ -55,14 +56,23 @@ import { AlertTriangle, RefreshCw, Loader2, KeyRound } from 'lucide-react';
 const STORAGE_KEY = 'rbtls_affiliate_build_engine_v1';
 
 export default function App() {
-  // Problem 2 Fix: Initial state starts EMPTY by default. Never auto-loads demo project!
+  // Legacy State Migration: If stored project is an old demo project (e.g. demo-project-v1), discard it!
   const [project, setProject] = useState<AffiliateBuildProject>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
+        if (parsed && isLegacyDemoProject(parsed)) {
+          const fresh = createEmptyBuildProject();
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
+          return fresh;
+        }
         if (parsed && parsed.id && parsed.researchInput) {
-          return parsed;
+          // Preserve genuine user projects
+          return {
+            ...parsed,
+            schemaVersion: parsed.schemaVersion || 2
+          };
         }
       }
     } catch {
@@ -320,22 +330,10 @@ export default function App() {
     setLoadingMessageAr(loadingMsg);
     setErrorState(null);
 
-    // Build headers with BYOK credentials if present in session
+    // Single consistent transport: credentials sent in JSON POST body over HTTPS
     const headers: Record<string, string> = {
       'Content-Type': 'application/json'
     };
-
-    if (aiConnection && aiConnection.apiKey) {
-      headers['x-ai-provider'] = aiConnection.provider;
-      headers['x-ai-api-key'] = aiConnection.apiKey;
-      headers['x-ai-model'] = aiConnection.model;
-      if (aiConnection.baseUrl) {
-        headers['x-ai-base-url'] = encodeURIComponent(aiConnection.baseUrl);
-      }
-      if (aiConnection.providerName) {
-        headers['x-ai-provider-name'] = encodeURIComponent(aiConnection.providerName);
-      }
-    }
 
     try {
       const res = await fetch(endpoint, {
@@ -417,12 +415,13 @@ export default function App() {
     );
   };
 
-  // 2. Generate Customer Journey (Invalidates downstream Funnel onward)
+  // 2. Generate Customer Journey (Fast Strategy First + Immediate Transition)
   const handleGenerateJourney = async () => {
     await runAiOperation<any>(
-      'بنرسم رحلة العميل وبنراجع Message Match...',
+      'بنرسم استراتيجية رحلة العميل السريعة وبنراجع Message Match...',
       '/api/build/journey',
       {
+        mode: 'journey_strategy',
         researchInput: project.researchInput,
         lockedElements: project.lockedElements
       },
@@ -430,7 +429,8 @@ export default function App() {
         setProject((prev) => {
           const updated = {
             ...prev,
-            customerJourney: data
+            customerJourney: data,
+            currentStage: 'JOURNEY' as BuildStageId
           };
           return invalidateDownstream(updated, 'JOURNEY');
         });
@@ -438,13 +438,30 @@ export default function App() {
     );
   };
 
-  // 3. Generate Funnel Strategy (Problem 5: confirmedByStudent is false, invalidates Lead Magnet onward)
+  // On-demand: Deep diagnosis for journey
+  const handleGenerateJourneyDetails = async (stepOrder = 1) => {
+    await runAiOperation<any>(
+      'بنحلل التفاصيل السلوكية والنفسية للمرحلة المحددة...',
+      '/api/build/journey',
+      {
+        mode: 'journey_details',
+        selectedStepOrder: stepOrder,
+        researchInput: project.researchInput
+      },
+      (_data) => {
+        // Detailed insights loaded
+      }
+    );
+  };
+
+  // 3. Generate Funnel Strategy (Phase A: Fast options comparison)
   const handleGenerateFunnel = async () => {
     if (project.lockedElements.funnel) return;
     await runAiOperation<any>(
-      'بنقارن نماذج الفانل...',
+      'بنقارن نماذج الفانل على 10 أبعاد استراتيجية...',
       '/api/build/funnel',
       {
+        mode: 'funnel_options',
         researchInput: project.researchInput,
         customerJourney: project.customerJourney
       },
@@ -463,13 +480,42 @@ export default function App() {
     );
   };
 
-  // 4. Generate Lead Magnet (Invalidates Pages onward)
+  // Phase B: On-demand Funnel Details (Expands map nodes & MVF for selected funnel)
+  const handleExpandFunnelDetails = async () => {
+    if (!project.funnelStrategy) return;
+    await runAiOperation<any>(
+      'بنبني تفاصيل خريطة الفانل والنسخة المصغرة للنموذج المختار...',
+      '/api/build/funnel',
+      {
+        mode: 'funnel_details',
+        selectedFunnelId: project.funnelStrategy.primaryFunnelId,
+        researchInput: project.researchInput,
+        customerJourney: project.customerJourney
+      },
+      (data) => {
+        setProject((prev) => {
+          if (!prev.funnelStrategy) return prev;
+          return {
+            ...prev,
+            funnelStrategy: {
+              ...prev.funnelStrategy,
+              funnelMapNodes: data.funnelMapNodes || prev.funnelStrategy.funnelMapNodes,
+              minimumViableFunnel: data.minimumViableFunnel || prev.funnelStrategy.minimumViableFunnel
+            }
+          };
+        });
+      }
+    );
+  };
+
+  // 4. Generate Lead Magnet (Phase A: 5 evaluated concepts with scores)
   const handleGenerateLeadMagnet = async () => {
     if (project.lockedElements.leadMagnet) return;
     await runAiOperation<any>(
-      'بنولد أفكار Lead Magnet...',
+      'بنولد ونقيم 5 أفكار Lead Magnet متنوعة...',
       '/api/build/lead-magnet',
       {
+        mode: 'lead_magnet_options',
         researchInput: project.researchInput,
         customerJourney: project.customerJourney,
         funnelStrategy: project.funnelStrategy
@@ -480,6 +526,7 @@ export default function App() {
             ...prev,
             leadMagnet: {
               ...data,
+              confirmedByStudent: false,
               promiseStatement:
                 prev.lockedElements.promise && prev.leadMagnet
                   ? prev.leadMagnet.promiseStatement
@@ -492,12 +539,50 @@ export default function App() {
     );
   };
 
-  // 5. Generate Pages (Invalidates Email onward)
+  // Phase B: On-demand Lead Magnet Details (Sections, Actionable items, Offer Bridge)
+  const handleGenerateLeadMagnetDetails = async () => {
+    if (!project.leadMagnet) return;
+    const currentConcept = project.leadMagnet.concepts.find(
+      (c) => c.id === project.leadMagnet?.selectedConceptId
+    );
+    await runAiOperation<any>(
+      'بنبني الهيكل التنفيذي التفصيلي والجسر للعرض...',
+      '/api/build/lead-magnet',
+      {
+        mode: 'lead_magnet_details',
+        selectedConceptId: project.leadMagnet.selectedConceptId,
+        selectedConcept: currentConcept,
+        researchInput: project.researchInput,
+        customerJourney: project.customerJourney,
+        funnelStrategy: project.funnelStrategy
+      },
+      (detailsData) => {
+        setProject((prev) => {
+          if (!prev.leadMagnet) return prev;
+          return {
+            ...prev,
+            leadMagnet: {
+              ...prev.leadMagnet,
+              promiseStatement: prev.lockedElements.promise
+                ? prev.leadMagnet.promiseStatement
+                : detailsData.promiseStatement || prev.leadMagnet.promiseStatement,
+              contentArchitecture:
+                detailsData.contentArchitecture || prev.leadMagnet.contentArchitecture,
+              offerBridge: detailsData.offerBridge || prev.leadMagnet.offerBridge
+            }
+          };
+        });
+      }
+    );
+  };
+
+  // 5. Generate Pages (Phase A: Fast page purpose map & 10 headlines)
   const handleGeneratePages = async () => {
     await runAiOperation<PagesData>(
-      'بنبني هيكل ونصوص الصفحات...',
+      'بنبني خريطة الصفحات ومحرك العناوين...',
       '/api/build/pages',
       {
+        mode: 'pages_strategy',
         researchInput: project.researchInput,
         leadMagnet: project.leadMagnet,
         proofLibrary: project.proofLibrary
@@ -531,6 +616,61 @@ export default function App() {
     );
   };
 
+  // Phase B: On-demand Page Details (Complete copy for all pages with selected headline)
+  const handleGeneratePagesDetails = async () => {
+    if (!project.pages) return;
+    await runAiOperation<any>(
+      'بنصيغ النصوص الكاملة لصفحة الهبوط والشكر والجسر...',
+      '/api/build/pages',
+      {
+        mode: 'page_details',
+        selectedHeadlineId: project.pages.landingPage.selectedHeadlineId,
+        headlineText: project.pages.landingPage.headlineAr,
+        researchInput: project.researchInput,
+        leadMagnet: project.leadMagnet,
+        proofLibrary: project.proofLibrary
+      },
+      (detailsData) => {
+        setProject((prev) => {
+          if (!prev.pages) return prev;
+          return {
+            ...prev,
+            pages: {
+              ...prev.pages,
+              landingPage: {
+                ...prev.pages.landingPage,
+                ...detailsData.landingPage,
+                headlineAr:
+                  prev.lockedElements.headline && prev.pages
+                    ? prev.pages.landingPage.headlineAr
+                    : detailsData.landingPage?.headlineAr || prev.pages.landingPage.headlineAr,
+                ctaButtonTextAr:
+                  prev.lockedElements.mainCta && prev.pages
+                    ? prev.pages.landingPage.ctaButtonTextAr
+                    : detailsData.landingPage?.ctaButtonTextAr || prev.pages.landingPage.ctaButtonTextAr,
+                status: 'REVIEW' as CopyStatus
+              },
+              thankYouPage: {
+                ...prev.pages.thankYouPage,
+                ...detailsData.thankYouPage,
+                status: 'REVIEW' as CopyStatus
+              },
+              bridgePage: {
+                ...prev.pages.bridgePage,
+                ...detailsData.bridgePage,
+                status: 'REVIEW' as CopyStatus
+              },
+              reviewComparisonPage: {
+                ...prev.pages.reviewComparisonPage,
+                ...detailsData.reviewComparisonPage
+              }
+            }
+          };
+        });
+      }
+    );
+  };
+
   const handleRegenerateHeadlinesOnly = async () => {
     if (project.lockedElements.headline) return;
     await runAiOperation<any[]>(
@@ -558,13 +698,14 @@ export default function App() {
     );
   };
 
-  // 6. Generate Email System (Invalidates Automation onward)
+  // 6. Generate Email System (Phase A: Fast Strategy & Blueprint)
   const handleGenerateEmailSystem = async () => {
     if (project.lockedElements.emailSequence) return;
     await runAiOperation<any>(
-      'بنرتب سلسلة الإيميلات...',
+      'بنحدد استراتيجية السلسلة ومخطط الإيميلات...',
       '/api/build/email',
       {
+        mode: 'email_strategy',
         researchInput: project.researchInput,
         leadMagnet: project.leadMagnet,
         pages: project.pages
@@ -577,6 +718,36 @@ export default function App() {
           };
           return invalidateDownstream(updated, 'EMAIL');
         });
+      }
+    );
+  };
+
+  // Phase B: On-demand All Emails Copy (Full rich direct-response copy)
+  const handleGenerateAllEmailsCopy = async () => {
+    if (project.lockedElements.emailSequence || !project.emailSystem) return;
+    await runAiOperation<any>(
+      'بنصيغ نصوص جميع الإيميلات الكاملة مع خيارات العناوين...',
+      '/api/build/email',
+      {
+        mode: 'email_details',
+        researchInput: project.researchInput,
+        leadMagnet: project.leadMagnet,
+        pages: project.pages,
+        emailSystem: project.emailSystem
+      },
+      (detailsData) => {
+        if (detailsData.emailsCopy && Array.isArray(detailsData.emailsCopy)) {
+          setProject((prev) => {
+            if (!prev.emailSystem) return prev;
+            return {
+              ...prev,
+              emailSystem: {
+                ...prev.emailSystem,
+                emailsCopy: detailsData.emailsCopy
+              }
+            };
+          });
+        }
       }
     );
   };
@@ -615,16 +786,18 @@ export default function App() {
     );
   };
 
-  // 7. Generate Automation (Invalidates QA)
+  // 7. Generate Automation (Phase A: Fast Taxonomy & Triggers)
   const handleGenerateAutomation = async (platform?: EmailPlatform) => {
+    const chosenPlatform = platform || project.automation?.selectedPlatform || 'Platform-Agnostic';
     await runAiOperation<any>(
-      'بنراجع منطق الأتمتة...',
+      'بنبني نظام التاجات وشروط الخروج الآمنة...',
       '/api/build/automation',
       {
+        mode: 'automation_strategy',
         researchInput: project.researchInput,
         leadMagnet: project.leadMagnet,
         emailSystem: project.emailSystem,
-        selectedPlatform: platform || project.automation?.selectedPlatform || 'Platform-Agnostic'
+        selectedPlatform: chosenPlatform
       },
       (data) => {
         setProject((prev) => {
@@ -633,6 +806,36 @@ export default function App() {
             automation: data
           };
           return invalidateDownstream(updated, 'AUTOMATION');
+        });
+      }
+    );
+  };
+
+  // Phase B: On-demand Automation Details (Workflow nodes & platform translation)
+  const handleExpandAutomationDetails = async () => {
+    if (!project.automation) return;
+    await runAiOperation<any>(
+      'بنبني مسارات سير العمل التفصيلية وترجمتها للمنصة...',
+      '/api/build/automation',
+      {
+        mode: 'automation_details',
+        researchInput: project.researchInput,
+        leadMagnet: project.leadMagnet,
+        emailSystem: project.emailSystem,
+        selectedPlatform: project.automation.selectedPlatform
+      },
+      (detailsData) => {
+        setProject((prev) => {
+          if (!prev.automation) return prev;
+          return {
+            ...prev,
+            automation: {
+              ...prev.automation,
+              workflowNodes: detailsData.workflowNodes || prev.automation.workflowNodes,
+              platformTranslationNotesAr:
+                detailsData.platformTranslationNotesAr || prev.automation.platformTranslationNotesAr
+            }
+          };
         });
       }
     );

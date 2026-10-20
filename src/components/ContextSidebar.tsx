@@ -360,7 +360,7 @@ export const ContextSidebar: React.FC<ContextSidebarProps> = ({
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="hidden xl:block w-[320px] shrink-0 bg-[#0C0B0E] border-r border-white/8 p-5 self-start sticky top-4 rounded-xl no-print">
+      <aside className="hidden xl:block w-[320px] shrink-0 bg-[#0C0B0E] border border-white/8 p-5 self-start sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl no-print">
         {sidebarContent}
       </aside>
 

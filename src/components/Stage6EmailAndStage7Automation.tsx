@@ -23,6 +23,7 @@ import {
 interface Stage6EmailProps {
   emailSystem: EmailSystemData | null;
   onGenerateEmailSystem: () => Promise<void>;
+  onGenerateAllEmailsCopy?: () => Promise<void>;
   onRewriteSingleEmail: (emailNumber: number) => Promise<void>;
   onUpdateEmailCopy: (emailNumber: number, patch: Partial<GeneratedEmailCopy>) => void;
   isEmailSequenceLocked: boolean;
@@ -34,6 +35,7 @@ interface Stage6EmailProps {
 export const Stage6EmailSystem: React.FC<Stage6EmailProps> = ({
   emailSystem,
   onGenerateEmailSystem,
+  onGenerateAllEmailsCopy,
   onRewriteSingleEmail,
   onUpdateEmailCopy,
   isEmailSequenceLocked,
@@ -87,6 +89,18 @@ export const Stage6EmailSystem: React.FC<Stage6EmailProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {onGenerateAllEmailsCopy && (
+            <button
+              type="button"
+              disabled={isGenerating || isEmailSequenceLocked}
+              onClick={onGenerateAllEmailsCopy}
+              className="px-3.5 py-2 bg-[#F5BF1E] hover:bg-[#FBD052] text-[#040405] font-bold rounded-lg text-xs flex items-center gap-1.5 transition-colors"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>توليد نصوص جميع الإيميلات</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={onToggleEmailLock}
@@ -107,7 +121,7 @@ export const Stage6EmailSystem: React.FC<Stage6EmailProps> = ({
             className="px-4 py-2 bg-[#141216] hover:bg-[#23170D] disabled:opacity-40 border border-[#F5BF1E]/30 rounded-lg text-xs font-semibold text-[#FBD052] flex items-center gap-2"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isGenerating ? 'animate-spin' : ''}`} />
-            <span>إعادة بناء السلسلة</span>
+            <span>إعادة بناء المخطط</span>
           </button>
         </div>
       </div>
@@ -378,6 +392,7 @@ export const Stage6EmailSystem: React.FC<Stage6EmailProps> = ({
 interface Stage7AutomationProps {
   automation: AutomationData | null;
   onGenerateAutomation: (platform?: EmailPlatform) => Promise<void>;
+  onExpandAutomationDetails?: () => Promise<void>;
   onSelectPlatform: (platform: EmailPlatform) => void;
   onProceedToTracking: () => void;
   isGenerating: boolean;
@@ -397,6 +412,7 @@ const PLATFORMS: EmailPlatform[] = [
 export const Stage7AutomationArchitect: React.FC<Stage7AutomationProps> = ({
   automation,
   onGenerateAutomation,
+  onExpandAutomationDetails,
   onSelectPlatform,
   onProceedToTracking,
   isGenerating
@@ -443,15 +459,29 @@ export const Stage7AutomationArchitect: React.FC<Stage7AutomationProps> = ({
             </p>
           </div>
 
-          <button
-            type="button"
-            disabled={isGenerating}
-            onClick={() => onGenerateAutomation(automation.selectedPlatform)}
-            className="px-4 py-2 bg-[#141216] hover:bg-[#23170D] border border-[#F5BF1E]/30 rounded-lg text-xs font-semibold text-[#FBD052] flex items-center gap-2"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isGenerating ? 'animate-spin' : ''}`} />
-            <span>{isGenerating ? 'بنراجع منطق الأتمتة...' : 'تحديث منطق الأتمتة'}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {onExpandAutomationDetails && (
+              <button
+                type="button"
+                disabled={isGenerating}
+                onClick={onExpandAutomationDetails}
+                className="px-3.5 py-2 bg-[#F5BF1E] hover:bg-[#FBD052] text-[#040405] font-bold rounded-lg text-xs flex items-center gap-1.5 transition-colors"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>توسيع مسارات وعقد الأتمتة</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              disabled={isGenerating}
+              onClick={() => onGenerateAutomation(automation.selectedPlatform)}
+              className="px-4 py-2 bg-[#141216] hover:bg-[#23170D] border border-[#F5BF1E]/30 rounded-lg text-xs font-semibold text-[#FBD052] flex items-center gap-2"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isGenerating ? 'animate-spin' : ''}`} />
+              <span>{isGenerating ? 'بنراجع منطق الأتمتة...' : 'تحديث منطق الأتمتة'}</span>
+            </button>
+          </div>
         </div>
 
         {/* Platform Selector */}

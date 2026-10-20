@@ -22,6 +22,7 @@ interface Stage5PagesArchitectProps {
   project: AffiliateBuildProject;
   pages: PagesData | null;
   onGeneratePages: () => Promise<void>;
+  onGeneratePagesDetails?: () => Promise<void>;
   onRegenerateHeadlines: () => Promise<void>;
   onSelectHeadline: (headlineId: string, headlineText: string) => void;
   onUpdateLandingCopy: (patch: Partial<PagesData['landingPage']>) => void;
@@ -38,6 +39,7 @@ export const Stage5PagesArchitect: React.FC<Stage5PagesArchitectProps> = ({
   project,
   pages,
   onGeneratePages,
+  onGeneratePagesDetails,
   onRegenerateHeadlines,
   onSelectHeadline,
   onUpdateLandingCopy,
@@ -112,15 +114,29 @@ export const Stage5PagesArchitect: React.FC<Stage5PagesArchitectProps> = ({
           </p>
         </div>
 
-        <button
-          type="button"
-          disabled={isGenerating}
-          onClick={onGeneratePages}
-          className="px-4 py-2 bg-[#141216] hover:bg-[#23170D] border border-[#F5BF1E]/30 rounded-lg text-xs font-semibold text-[#FBD052] flex items-center gap-2"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${isGenerating ? 'animate-spin' : ''}`} />
-          <span>إعادة توليد منظومة الصفحات</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {onGeneratePagesDetails && (
+            <button
+              type="button"
+              disabled={isGenerating}
+              onClick={onGeneratePagesDetails}
+              className="px-4 py-2 bg-[#F5BF1E] hover:bg-[#FBD052] text-[#040405] font-bold rounded-lg text-xs flex items-center gap-2 transition-colors"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>توليد نصوص الصفحات الكاملة بالعنوان المختار</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            disabled={isGenerating}
+            onClick={onGeneratePages}
+            className="px-4 py-2 bg-[#141216] hover:bg-[#23170D] border border-[#F5BF1E]/30 rounded-lg text-xs font-semibold text-[#FBD052] flex items-center gap-2"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isGenerating ? 'animate-spin' : ''}`} />
+            <span>إعادة خريطة الصفحات والعناوين</span>
+          </button>
+        </div>
       </div>
 
       {/* Sub-Navigation Tabs */}
